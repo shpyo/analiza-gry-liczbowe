@@ -21,14 +21,16 @@ for ($i = 1; $i <= $pickCount; $i++) {
     $numberCols[] = "n{$i}";
 }
 
-$unionParts = [];
+$colList   = implode(', ', array_map(fn($c) => "`{$c}`", $numberCols));
+$cteParts  = [];
 foreach ($numberCols as $col) {
-    $unionParts[] = "SELECT `{$col}` AS num FROM `{$drawsTable}` ORDER BY draw_number DESC LIMIT 500";
+    $cteParts[] = "SELECT `{$col}` AS num FROM last500";
 }
-$unionSQL = implode(' UNION ALL ', $unionParts);
+$unionSQL = implode(' UNION ALL ', $cteParts);
 
 $freqRows = $pdo->query(
-    "SELECT num, COUNT(*) AS freq FROM ({$unionSQL}) AS t WHERE num IS NOT NULL GROUP BY num"
+    "WITH last500 AS (SELECT {$colList} FROM `{$drawsTable}` ORDER BY draw_number DESC LIMIT 500)
+     SELECT num, COUNT(*) AS freq FROM ({$unionSQL}) AS t WHERE num IS NOT NULL GROUP BY num"
 )->fetchAll(PDO::FETCH_KEY_PAIR);
 
 // weight = freq + 1 (min 1 so undrawn numbers are still eligible)

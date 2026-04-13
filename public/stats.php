@@ -95,14 +95,16 @@ foreach ($totalFreqStmt->fetchAll() as $row) {
     $totalFreqMap[(int)$row['num']] = (int)$row['freq'];
 }
 
-// Window frequency (last 500 draws, no date filter applied to window - always last 500)
-$unionWinParts = [];
+// Window frequency (last 500 draws, no date filter - always last 500); CTE fetches once
+$winColList  = implode(', ', array_map(fn($c) => "`{$c}`", $numberCols));
+$winCteParts = [];
 foreach ($numberCols as $col) {
-    $unionWinParts[] = "SELECT `{$col}` AS num FROM `{$drawsTable}` ORDER BY draw_number DESC LIMIT 500";
+    $winCteParts[] = "SELECT `{$col}` AS num FROM last500";
 }
-$unionWinSQL = implode(' UNION ALL ', $unionWinParts);
+$unionWinSQL = implode(' UNION ALL ', $winCteParts);
 $winFreqRows = $pdo->query(
-    "SELECT num, COUNT(*) AS freq FROM ({$unionWinSQL}) AS t WHERE num IS NOT NULL GROUP BY num"
+    "WITH last500 AS (SELECT {$winColList} FROM `{$drawsTable}` ORDER BY draw_number DESC LIMIT 500)
+     SELECT num, COUNT(*) AS freq FROM ({$unionWinSQL}) AS t WHERE num IS NOT NULL GROUP BY num"
 )->fetchAll();
 foreach ($winFreqRows as $row) {
     $windowFreqMap[(int)$row['num']] = (int)$row['freq'];

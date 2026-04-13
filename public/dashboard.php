@@ -26,15 +26,17 @@ for ($i = 1; $i <= $pickCount; $i++) {
     $numberCols[] = "n{$i}";
 }
 
-// Build a UNION query to count each number's frequency
-$unionParts = [];
+// Build a CTE-based UNION query; last 500 draws fetched once
+$colList   = implode(', ', array_map(fn($c) => "`{$c}`", $numberCols));
+$cteParts  = [];
 foreach ($numberCols as $col) {
-    $unionParts[] = "SELECT `{$col}` AS num FROM `{$drawsTable}` ORDER BY draw_number DESC LIMIT 500";
+    $cteParts[] = "SELECT `{$col}` AS num FROM last500";
 }
-$unionSql = implode(' UNION ALL ', $unionParts);
+$unionSql = implode(' UNION ALL ', $cteParts);
 
 $freqRows = $pdo->query(
-    "SELECT num, COUNT(*) AS freq
+    "WITH last500 AS (SELECT {$colList} FROM `{$drawsTable}` ORDER BY draw_number DESC LIMIT 500)
+     SELECT num, COUNT(*) AS freq
      FROM ({$unionSql}) AS t
      WHERE num IS NOT NULL
      GROUP BY num
