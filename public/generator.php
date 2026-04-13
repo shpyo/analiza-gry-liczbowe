@@ -154,7 +154,7 @@ if ($formPosted) {
 // -----------------------------------------------------------------------
 $def = [
     'sum_min'        => (int)($_POST['sum_min']        ?? 0),
-    'sum_max'        => (int)($_POST['sum_max']        ?? 0),
+    'sum_max'        => (int)($_POST['sum_max']        ?? 9999),
     'even_min'       => (int)($_POST['even_min']       ?? 0),
     'even_max'       => (int)($_POST['even_max']       ?? $pickCount),
     'low_min'        => (int)($_POST['low_min']        ?? 0),
@@ -178,7 +178,7 @@ $postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hash
             <td><label>Suma min:</label></td>
             <td><input type="number" name="sum_min" value="<?= h((string)$def['sum_min']) ?>" min="0" max="999" style="width:80px;"></td>
             <td><label>Suma max:</label></td>
-            <td><input type="number" name="sum_max" value="<?= h((string)$def['sum_max']) ?>" min="0" max="999" style="width:80px;"></td>
+            <td><input type="number" name="sum_max" value="<?= h($def['sum_max'] > 0 ? (string)$def['sum_max'] : '') ?>" min="0" max="999" style="width:80px;" placeholder="max"></td>
         </tr>
         <tr>
             <td><label>Parzyste min:</label></td>

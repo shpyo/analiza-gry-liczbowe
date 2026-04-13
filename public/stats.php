@@ -54,13 +54,6 @@ if ($dateTo !== '') {
 }
 $dateWhereSQL = $dateWhere ? ('WHERE ' . implode(' AND ', $dateWhere)) : '';
 
-$totalDraws = (int)$pdo->prepare(
-    "SELECT COUNT(*) FROM `{$drawsTable}` {$dateWhereSQL}"
-)->execute($dateParams) ? $pdo->prepare(
-    "SELECT COUNT(*) FROM `{$drawsTable}` {$dateWhereSQL}"
-) : null;
-
-// Re-execute properly
 $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM `{$drawsTable}` {$dateWhereSQL}");
 $cntStmt->execute($dateParams);
 $totalDraws = (int)$cntStmt->fetchColumn();
@@ -90,8 +83,10 @@ foreach ($numberCols as $col) {
 $unionTotalSQL = implode(' UNION ALL ', $unionTotalParts);
 
 // Execute total freq
-$placeholders = implode(',', array_fill(0, count($dateParams) * $pickCount, '?'));
-$allDateParams = array_merge(...array_fill(0, $pickCount, $dateParams));
+$allDateParams = array_merge(...(count($dateParams) > 0 ? array_fill(0, $pickCount, $dateParams) : [[]]));
+if (empty($allDateParams)) {
+    $allDateParams = [];
+}
 
 $totalFreqStmt = $pdo->prepare(
     "SELECT num, COUNT(*) AS freq FROM ({$unionTotalSQL}) AS t WHERE num IS NOT NULL GROUP BY num"

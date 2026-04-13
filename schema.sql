@@ -114,7 +114,7 @@ CREATE TABLE IF NOT EXISTS mini_lotto_draw_profiles (
 CREATE TABLE IF NOT EXISTS sync_log (
   id INT AUTO_INCREMENT PRIMARY KEY,
   game_slug VARCHAR(20),
-  synced_at DATETIME DEFAULT NOW(),
+  synced_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   draws_added INT,
   last_draw_number INT,
   source_url VARCHAR(200),
