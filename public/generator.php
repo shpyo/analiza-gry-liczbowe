@@ -193,13 +193,13 @@ $postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hash
 
     <table style="width:auto; background:none; border:none;">
         <tr>
-            <td><label title="Suma wszystkich 6 liczb w kuponie. Historycznie ~68% losowań Lotto ma sumę 110–170.">Suma min:</label></td>
+            <td><label title="Suma wszystkich <?= $pickCount ?> liczb w kuponie. Zmień zakres aby zawęzić generowane kupony.">Suma min:</label></td>
             <td><input type="number" name="sum_min" value="<?= h((string)$def['sum_min']) ?>" min="0" max="999" style="width:80px;"></td>
-            <td><label title="Suma wszystkich 6 liczb w kuponie. Historycznie ~68% losowań Lotto ma sumę 110–170.">Suma max:</label></td>
+            <td><label title="Suma wszystkich <?= $pickCount ?> liczb w kuponie. Zmień zakres aby zawęzić generowane kupony.">Suma max:</label></td>
             <td><input type="number" name="sum_max" value="<?= h((string)$def['sum_max']) ?>" min="0" max="999" style="width:80px;"></td>
         </tr>
         <tr>
-            <td><label title="Ile liczb parzystych (2,4,6...) w kuponie. Rozkład historyczny: najczęściej 3 parzyste.">Parzyste min:</label></td>
+            <td><label title="Ile liczb parzystych (2,4,6...) w kuponie. Rozkład historyczny: najczęściej połowa lub blisko połowy.">Parzyste min:</label></td>
             <td>
                 <select name="even_min">
                     <?php for ($i = 0; $i <= $pickCount; $i++): ?>
@@ -207,7 +207,7 @@ $postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hash
                     <?php endfor; ?>
                 </select>
             </td>
-            <td><label title="Ile liczb parzystych (2,4,6...) w kuponie. Rozkład historyczny: najczęściej 3 parzyste.">Parzyste max:</label></td>
+            <td><label title="Ile liczb parzystych (2,4,6...) w kuponie. Rozkład historyczny: najczęściej połowa lub blisko połowy.">Parzyste max:</label></td>
             <td>
                 <select name="even_max">
                     <?php for ($i = 0; $i <= $pickCount; $i++): ?>
@@ -217,7 +217,7 @@ $postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hash
             </td>
         </tr>
         <tr>
-            <td><label title="Ile liczb z dolnej połowy puli (dla Lotto: 1–24). Rozkład historyczny: najczęściej 3 niskie.">Niskie min:</label></td>
+            <td><label title="Ile liczb z dolnej połowy puli (≤ <?= (int)$gameConfig['low_threshold'] ?>). Rozkład historyczny: najczęściej połowa lub blisko połowy.">Niskie min:</label></td>
             <td>
                 <select name="low_min">
                     <?php for ($i = 0; $i <= $pickCount; $i++): ?>
@@ -225,7 +225,7 @@ $postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hash
                     <?php endfor; ?>
                 </select>
             </td>
-            <td><label title="Ile liczb z dolnej połowy puli (dla Lotto: 1–24). Rozkład historyczny: najczęściej 3 niskie.">Niskie max:</label></td>
+            <td><label title="Ile liczb z dolnej połowy puli (≤ <?= (int)$gameConfig['low_threshold'] ?>). Rozkład historyczny: najczęściej połowa lub blisko połowy.">Niskie max:</label></td>
             <td>
                 <select name="low_max">
                     <?php for ($i = 0; $i <= $pickCount; $i++): ?>

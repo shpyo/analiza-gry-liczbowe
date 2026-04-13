@@ -121,7 +121,7 @@ $totalDraws = (int)$pdo->query("SELECT COUNT(*) FROM `{$drawsTable}`")->fetchCol
 <h3>Metryki</h3>
 <table style="width:auto;">
     <tr><th>Metryka</th><th>Wartość</th></tr>
-    <tr><td title="Suma wszystkich liczb. Dla Lotto 6/49 zakres to 21–279, typowy zakres to 110–170 (68% losowań).">Suma</td>                    <td><?= h((string)$metrics['sum_total']) ?></td></tr>
+    <tr><td title="Suma wszystkich liczb w kombinacji.">Suma</td>                    <td><?= h((string)$metrics['sum_total']) ?></td></tr>
     <tr><td title="Ile liczb w kombinacji jest parzystych (2,4,6,...)">Parzyste</td>                <td><?= h((string)$metrics['even_count']) ?></td></tr>
     <tr><td title="Ile liczb jest nieparzystych (1,3,5,...)">Nieparzyste</td>             <td><?= h((string)($pickCount - $metrics['even_count'])) ?></td></tr>
     <tr><td title="Ile liczb jest w dolnej połowie puli">Niskie (≤ <?= (int)$gameConfig['low_threshold'] ?>)</td>
