@@ -1,0 +1,307 @@
+<?php
+declare(strict_types=1);
+
+/**
+ * generator.php - Weighted random coupon generator with profile filters
+ * Included by index.php; $pdo, $game are available.
+ */
+
+$gameConfig   = get_game_config($pdo, $game);
+$gameName     = $gameConfig['name'];
+$drawsTable   = GAME_TABLES[$game];
+$profileTable = PROFILE_TABLES[$game];
+$pickCount    = (int)$gameConfig['pick_count'];
+$poolSize     = (int)$gameConfig['pool_size'];
+
+// -----------------------------------------------------------------------
+// Build number weights from last 500 draws
+// -----------------------------------------------------------------------
+$numberCols  = [];
+for ($i = 1; $i <= $pickCount; $i++) {
+    $numberCols[] = "n{$i}";
+}
+
+$unionParts = [];
+foreach ($numberCols as $col) {
+    $unionParts[] = "SELECT `{$col}` AS num FROM `{$drawsTable}` ORDER BY draw_number DESC LIMIT 500";
+}
+$unionSQL = implode(' UNION ALL ', $unionParts);
+
+$freqRows = $pdo->query(
+    "SELECT num, COUNT(*) AS freq FROM ({$unionSQL}) AS t WHERE num IS NOT NULL GROUP BY num"
+)->fetchAll(PDO::FETCH_KEY_PAIR);
+
+// weight = freq + 1 (min 1 so undrawn numbers are still eligible)
+$weights = [];
+for ($n = 1; $n <= $poolSize; $n++) {
+    $weights[$n] = (int)($freqRows[$n] ?? 0) + 1;
+}
+
+// Top-10 hot numbers
+arsort($freqRows);
+$top10 = array_keys(array_slice($freqRows, 0, 10, true));
+
+// -----------------------------------------------------------------------
+// Profile hashes for select
+// -----------------------------------------------------------------------
+$profileHashes = $pdo->query(
+    "SELECT profile_hash, total_draws, pct_of_total FROM `{$profileTable}` ORDER BY total_draws DESC"
+)->fetchAll();
+
+// -----------------------------------------------------------------------
+// Handle POST - generate coupons
+// -----------------------------------------------------------------------
+$results     = [];
+$warnings    = [];
+$formPosted  = $_SERVER['REQUEST_METHOD'] === 'POST';
+
+if ($formPosted) {
+    $sumMin      = isset($_POST['sum_min'])       ? (int)$_POST['sum_min']       : 0;
+    $sumMax      = isset($_POST['sum_max'])       ? (int)$_POST['sum_max']       : 9999;
+    $evenMin     = isset($_POST['even_min'])      ? (int)$_POST['even_min']      : 0;
+    $evenMax     = isset($_POST['even_max'])      ? (int)$_POST['even_max']      : $pickCount;
+    $lowMin      = isset($_POST['low_min'])       ? (int)$_POST['low_min']       : 0;
+    $lowMax      = isset($_POST['low_max'])       ? (int)$_POST['low_max']       : $pickCount;
+    $consecMax   = isset($_POST['consec_max'])    ? (int)$_POST['consec_max']    : $pickCount;
+    $hotMin      = isset($_POST['hot_min'])       ? (int)$_POST['hot_min']       : 0;
+    $lastDigMax  = isset($_POST['last_digit_max'])? (int)$_POST['last_digit_max']: $pickCount;
+    $wantedHashes= isset($_POST['profile_hashes']) && is_array($_POST['profile_hashes'])
+                     ? $_POST['profile_hashes'] : [];
+    $count       = max(1, min(20, (int)($_POST['count'] ?? 5)));
+
+    // Sanitize wanted hashes against known hashes
+    $knownHashes  = array_column($profileHashes, 'profile_hash');
+    $wantedHashes = array_values(array_intersect($wantedHashes, $knownHashes));
+
+    $maxAttempts = 50000;
+    $attempts    = 0;
+
+    while (count($results) < $count && $attempts < $maxAttempts) {
+        $attempts++;
+
+        // Weighted sampling without replacement
+        $pool     = $weights; // [num => weight]
+        $selected = [];
+
+        for ($pick = 0; $pick < $pickCount; $pick++) {
+            $totalW = array_sum($pool);
+            if ($totalW <= 0) {
+                break;
+            }
+            $rand = mt_rand(1, $totalW);
+            $cum  = 0;
+            foreach ($pool as $num => $w) {
+                $cum += $w;
+                if ($rand <= $cum) {
+                    $selected[] = $num;
+                    unset($pool[$num]);
+                    break;
+                }
+            }
+        }
+
+        if (count($selected) !== $pickCount) {
+            continue;
+        }
+
+        sort($selected);
+        $metrics = compute_metrics($selected, $game);
+        $hash    = compute_profile_hash($metrics, $game);
+
+        // Apply filters
+        if ($metrics['sum_total'] < $sumMin || $metrics['sum_total'] > $sumMax) {
+            continue;
+        }
+        if ($metrics['even_count'] < $evenMin || $metrics['even_count'] > $evenMax) {
+            continue;
+        }
+        if ($metrics['low_count'] < $lowMin || $metrics['low_count'] > $lowMax) {
+            continue;
+        }
+        if ($metrics['consecutive'] > $consecMax) {
+            continue;
+        }
+        if ($metrics['last_digit_unique'] > $lastDigMax) {
+            continue;
+        }
+
+        // Hot numbers filter
+        $hotInCoupon = count(array_intersect($selected, $top10));
+        if ($hotInCoupon < $hotMin) {
+            continue;
+        }
+
+        // Profile hash filter
+        if (!empty($wantedHashes) && !in_array($hash, $wantedHashes, true)) {
+            continue;
+        }
+
+        $results[] = [
+            'numbers' => $selected,
+            'metrics' => $metrics,
+            'hash'    => $hash,
+        ];
+    }
+
+    if (count($results) < $count) {
+        $warnings[] = "Znaleziono tylko " . count($results) . " z {$count} kuponów po {$attempts} próbach. "
+                    . "Spróbuj poluzować kryteria filtrowania.";
+    }
+}
+
+// -----------------------------------------------------------------------
+// Default form values
+// -----------------------------------------------------------------------
+$def = [
+    'sum_min'        => (int)($_POST['sum_min']        ?? 0),
+    'sum_max'        => (int)($_POST['sum_max']        ?? 0),
+    'even_min'       => (int)($_POST['even_min']       ?? 0),
+    'even_max'       => (int)($_POST['even_max']       ?? $pickCount),
+    'low_min'        => (int)($_POST['low_min']        ?? 0),
+    'low_max'        => (int)($_POST['low_max']        ?? $pickCount),
+    'consec_max'     => (int)($_POST['consec_max']     ?? $pickCount - 1),
+    'hot_min'        => (int)($_POST['hot_min']        ?? 0),
+    'last_digit_max' => (int)($_POST['last_digit_max'] ?? $pickCount),
+    'count'          => (int)($_POST['count']          ?? 5),
+];
+$postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hashes'])
+    ? $_POST['profile_hashes'] : [];
+?>
+<h1><?= h($gameName) ?> &mdash; Generator kuponów</h1>
+
+<form method="post" action="">
+    <input type="hidden" name="page" value="generator">
+    <input type="hidden" name="game" value="<?= h($game) ?>">
+
+    <table style="width:auto; background:none; border:none;">
+        <tr>
+            <td><label>Suma min:</label></td>
+            <td><input type="number" name="sum_min" value="<?= h((string)$def['sum_min']) ?>" min="0" max="999" style="width:80px;"></td>
+            <td><label>Suma max:</label></td>
+            <td><input type="number" name="sum_max" value="<?= h((string)$def['sum_max']) ?>" min="0" max="999" style="width:80px;"></td>
+        </tr>
+        <tr>
+            <td><label>Parzyste min:</label></td>
+            <td>
+                <select name="even_min">
+                    <?php for ($i = 0; $i <= $pickCount; $i++): ?>
+                        <option value="<?= $i ?>" <?= $def['even_min'] === $i ? 'selected' : '' ?>><?= $i ?></option>
+                    <?php endfor; ?>
+                </select>
+            </td>
+            <td><label>Parzyste max:</label></td>
+            <td>
+                <select name="even_max">
+                    <?php for ($i = 0; $i <= $pickCount; $i++): ?>
+                        <option value="<?= $i ?>" <?= $def['even_max'] === $i ? 'selected' : '' ?>><?= $i ?></option>
+                    <?php endfor; ?>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td><label>Niskie min:</label></td>
+            <td>
+                <select name="low_min">
+                    <?php for ($i = 0; $i <= $pickCount; $i++): ?>
+                        <option value="<?= $i ?>" <?= $def['low_min'] === $i ? 'selected' : '' ?>><?= $i ?></option>
+                    <?php endfor; ?>
+                </select>
+            </td>
+            <td><label>Niskie max:</label></td>
+            <td>
+                <select name="low_max">
+                    <?php for ($i = 0; $i <= $pickCount; $i++): ?>
+                        <option value="<?= $i ?>" <?= $def['low_max'] === $i ? 'selected' : '' ?>><?= $i ?></option>
+                    <?php endfor; ?>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td><label>Maks. kolejnych par:</label></td>
+            <td>
+                <select name="consec_max">
+                    <?php for ($i = 0; $i < $pickCount; $i++): ?>
+                        <option value="<?= $i ?>" <?= $def['consec_max'] === $i ? 'selected' : '' ?>><?= $i ?></option>
+                    <?php endfor; ?>
+                </select>
+            </td>
+            <td><label>Min. gorących (top-10):</label></td>
+            <td>
+                <select name="hot_min">
+                    <?php for ($i = 0; $i <= $pickCount; $i++): ?>
+                        <option value="<?= $i ?>" <?= $def['hot_min'] === $i ? 'selected' : '' ?>><?= $i ?></option>
+                    <?php endfor; ?>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td><label>Maks. tych samych ostatnich cyfr:</label></td>
+            <td>
+                <select name="last_digit_max">
+                    <?php for ($i = 1; $i <= $pickCount; $i++): ?>
+                        <option value="<?= $i ?>" <?= $def['last_digit_max'] === $i ? 'selected' : '' ?>><?= $i ?></option>
+                    <?php endfor; ?>
+                </select>
+            </td>
+            <td><label>Liczba kuponów:</label></td>
+            <td>
+                <select name="count">
+                    <?php foreach ([1,2,3,5,10,15,20] as $c): ?>
+                        <option value="<?= $c ?>" <?= $def['count'] === $c ? 'selected' : '' ?>><?= $c ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </td>
+        </tr>
+    </table>
+
+    <?php if (!empty($profileHashes)): ?>
+    <div style="margin-top:10px;">
+        <label>Profile (opcjonalnie, Ctrl+klik dla wielu):</label><br>
+        <select name="profile_hashes[]" multiple size="6" style="width:400px;">
+            <?php foreach ($profileHashes as $ph): ?>
+                <option value="<?= h($ph['profile_hash']) ?>"
+                    <?= in_array($ph['profile_hash'], $postedHashes, true) ? 'selected' : '' ?>>
+                    <?= h($ph['profile_hash']) ?>
+                    (<?= h((string)$ph['total_draws']) ?> × / <?= h((string)$ph['pct_of_total']) ?>%)
+                </option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+    <?php endif; ?>
+
+    <br><input type="submit" value="Generuj kupony">
+</form>
+
+<?php if (!empty($warnings)): ?>
+    <?php foreach ($warnings as $w): ?>
+        <div class="alert alert-error"><?= h($w) ?></div>
+    <?php endforeach; ?>
+<?php endif; ?>
+
+<?php if ($formPosted && !empty($results)): ?>
+<h2>Wygenerowane kupony (<?= count($results) ?>)</h2>
+<p>Top-10 gorących: <?php foreach ($top10 as $n): ?>
+    <span class="ball hot"><?= h((string)$n) ?></span>
+<?php endforeach; ?></p>
+
+<?php foreach ($results as $idx => $r): ?>
+<div class="coupon">
+    <strong>Kupon <?= $idx + 1 ?></strong>&nbsp;&nbsp;
+    <?php foreach ($r['numbers'] as $n): ?>
+        <span class="ball <?= in_array($n, $top10, true) ? 'hot' : '' ?>"><?= h((string)$n) ?></span>
+    <?php endforeach; ?>
+    <br>
+    <small>
+        Suma: <?= h((string)$r['metrics']['sum_total']) ?> &nbsp;|&nbsp;
+        Par.: <?= h((string)$r['metrics']['even_count']) ?> &nbsp;|&nbsp;
+        Niskie: <?= h((string)$r['metrics']['low_count']) ?> &nbsp;|&nbsp;
+        Kol.: <?= h((string)$r['metrics']['consecutive']) ?> &nbsp;|&nbsp;
+        Cyfry: <?= h((string)$r['metrics']['last_digit_unique']) ?> &nbsp;|&nbsp;
+        Profil: <code><?= h($r['hash']) ?></code>
+    </small>
+</div>
+<?php endforeach; ?>
+
+<?php elseif ($formPosted): ?>
+<div class="alert alert-error">Nie udało się wygenerować żadnego kuponu spełniającego kryteria.</div>
+<?php endif; ?>
