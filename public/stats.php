@@ -203,6 +203,102 @@ function sort_arrow(string $col): string
 <p>Łącznie losowań: <strong><?= h((string)$totalDraws) ?></strong> &mdash;
    Ostatni numer: <strong><?= h((string)$maxDrawNum) ?></strong></p>
 
+<?php
+// Build sorted freq list for quintile thresholds
+$_heatFreqs = [];
+for ($n = 1; $n <= $poolSize; $n++) {
+    $_heatFreqs[] = $windowFreqMap[$n] ?? 0;
+}
+sort($_heatFreqs);
+$_heatCnt = count($_heatFreqs);
+
+// Quintile thresholds [q20, q40, q60, q80]
+$_heatQ = [];
+for ($_qi = 1; $_qi <= 4; $_qi++) {
+    $idx = (int)floor($_heatCnt * $_qi / 5);
+    $_heatQ[] = $_heatFreqs[min($idx, $_heatCnt - 1)];
+}
+
+function _heatmap_bucket(int $freq, array $q): int {
+    for ($i = 0; $i < 4; $i++) {
+        if ($freq <= $q[$i]) return $i;
+    }
+    return 4;
+}
+?>
+<style>
+.hm-grid {
+    display: grid;
+    grid-template-columns: repeat(10, 40px);
+    gap: 4px;
+    margin: 12px 0 8px 0;
+}
+.hm-cell {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: default;
+    box-sizing: border-box;
+    user-select: none;
+}
+.hm-legend {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin: 6px 0 18px 0;
+    font-size: 12px;
+    color: #444;
+}
+.hm-legend-swatch {
+    display: inline-block;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.hm-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+</style>
+
+<h3>Heatmapa częstości – ostatnie 500 losowań</h3>
+<div class="hm-grid">
+<?php for ($n = 1; $n <= $poolSize; $n++):
+    $freq    = $windowFreqMap[$n] ?? 0;
+    $bucket  = _heatmap_bucket($freq, $_heatQ);
+    $clr     = heatmap_bucket_color($bucket);
+    $tooltip = h("{$n}: {$freq}/500");
+?>
+    <div class="hm-cell"
+         style="background:<?= $clr['bg'] ?>;color:<?= $clr['text'] ?>;"
+         title="<?= $tooltip ?>"><?= $n ?></div>
+<?php endfor; ?>
+</div>
+<?php
+$_legendLabels = ['rzadko', '', 'średnio', '', 'często'];
+?>
+<div class="hm-legend">
+<?php for ($b = 0; $b < 5; $b++):
+    $clr = heatmap_bucket_color($b);
+    $q_label = $b < 4
+        ? 'Q' . ($b+1) . ' (≤' . $_heatQ[$b] . ')'
+        : 'Q5 (>' . $_heatQ[3] . ')';
+?>
+    <div class="hm-legend-item" title="<?= h($q_label) ?>">
+        <span class="hm-legend-swatch" style="background:<?= $clr['bg'] ?>;border:1px solid #bbb;"></span>
+        <span><?= $_legendLabels[$b] !== '' ? $_legendLabels[$b] : '' ?></span>
+    </div>
+    <?php if ($b < 4): ?><span style="color:#bbb;">›</span><?php endif; ?>
+<?php endfor; ?>
+</div>
+
 <div style="background:#fff;border:1px solid #ddd;padding:12px 18px;margin-bottom:15px;border-radius:4px;font-size:0.9em;">
   <strong>📖 Objaśnienie kolumn:</strong>
   <ul style="margin:6px 0 0 0;padding-left:18px;">

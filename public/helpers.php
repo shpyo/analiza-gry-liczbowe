@@ -311,3 +311,24 @@ function h(string $val): string
 {
     return htmlspecialchars($val, ENT_QUOTES, 'UTF-8');
 }
+
+// ---------------------------------------------------------------------------
+// Heatmap colour helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns bg and text CSS colour strings for a heatmap quintile bucket (0–4).
+ * Bucket 0 = lowest 20%, bucket 4 = highest 20%.
+ * Palette: pale green → green → yellow → orange → deep red.
+ */
+function heatmap_bucket_color(int $bucket): array
+{
+    $palette = [
+        0 => ['bg' => '#bbf7d0', 'text' => '#14532d'], // Q1 pale green
+        1 => ['bg' => '#4ade80', 'text' => '#14532d'], // Q2 green
+        2 => ['bg' => '#fde047', 'text' => '#713f12'], // Q3 yellow
+        3 => ['bg' => '#fb923c', 'text' => '#431407'], // Q4 orange
+        4 => ['bg' => '#b91c1c', 'text' => '#fff'],    // Q5 deep red
+    ];
+    return $palette[max(0, min(4, $bucket))];
+}
