@@ -332,3 +332,106 @@ function heatmap_bucket_color(int $bucket): array
     ];
     return $palette[max(0, min(4, $bucket))];
 }
+
+// ---------------------------------------------------------------------------
+// Tooltip rendering (CSS-only, zero JS)
+// ---------------------------------------------------------------------------
+
+/**
+ * Renders an <abbr title="..."> with the metric label and tooltip description.
+ * Use as a table header or form label.
+ */
+function render_tooltip(string $metric, string $game = 'lotto'): string
+{
+    $label   = metric_label($metric);
+    $tooltip = metric_tooltip($metric, $game);
+    return '<abbr title="' . htmlspecialchars($tooltip, ENT_QUOTES, 'UTF-8') . '">'
+         . htmlspecialchars($label, ENT_QUOTES, 'UTF-8')
+         . ' <span style="font-size:0.75em;opacity:0.7;">?</span></abbr>';
+}
+
+// ---------------------------------------------------------------------------
+// Profile hash description helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Full human-readable description of a profile hash.
+ * Example: "3 parzyste · 3 niskie · suma średnia (110–170) · 1 para sąsiadów · rozstęp duży (40–44)"
+ */
+function describe_profile(string $hash, string $game = 'lotto'): string
+{
+    $parts = explode('_', $hash);
+    if (count($parts) < 5) {
+        return $hash; // graceful degradation
+    }
+
+    // Part 0: {even}e{odd}o
+    if (!preg_match('/^(\d+)e(\d+)o$/', $parts[0], $m0)) {
+        return $hash;
+    }
+    $even = (int)$m0[1];
+    $odd  = (int)$m0[2];
+
+    // Part 1: {low}l{high}h
+    if (!preg_match('/^(\d+)l(\d+)h$/', $parts[1], $m1)) {
+        return $hash;
+    }
+    $low  = (int)$m1[1];
+    $high = (int)$m1[2];
+
+    // Part 2: s{bucket}
+    $sumBucket = substr($parts[2] ?? 's?', 1);
+
+    // Part 3: c{consecutive}
+    if (!preg_match('/^c(\d+)$/', $parts[3] ?? '', $m3)) {
+        return $hash;
+    }
+    $consecutive = (int)$m3[1];
+
+    // Part 4: r{bucket}
+    $rangeBucket = substr($parts[4] ?? 'r?', 1);
+
+    $evenLabel = $even === 1 ? '1 parzysta' : "{$even} parzyste";
+    $lowLabel  = $low  === 1 ? '1 niska'    : "{$low} niskie";
+
+    if ($consecutive === 0) {
+        $consLabel = 'brak par sąsiadów';
+    } elseif ($consecutive === 1) {
+        $consLabel = '1 para sąsiadów';
+    } else {
+        $consLabel = "{$consecutive} pary sąsiadów";
+    }
+
+    $sumLabel   = 'suma ' . sum_bucket_label($sumBucket, $game);
+    $rangeLabel = 'rozstęp ' . range_bucket_label($rangeBucket, $game);
+
+    return implode(' · ', [$evenLabel, $lowLabel, $sumLabel, $consLabel, $rangeLabel]);
+}
+
+/**
+ * Short description for compact UI (list selects, table cells).
+ * Example: "3p/3n · sM · c1 · rL"
+ */
+function describe_profile_short(string $hash): string
+{
+    $parts = explode('_', $hash);
+    if (count($parts) < 5) {
+        return $hash; // graceful degradation
+    }
+
+    // Part 0: {even}e{odd}o → "3p/3n"
+    if (!preg_match('/^(\d+)e(\d+)o$/', $parts[0], $m0)) {
+        return $hash;
+    }
+    $even = $m0[1];
+    $odd  = $m0[2];
+
+    // Part 3: c{n}
+    $consec = isset($parts[3]) ? $parts[3] : 'c?';
+
+    // Part 2: sX and part 4: rX — keep as-is (short codes)
+    $sumCode   = $parts[2] ?? 's?';
+    $rangeCode = $parts[4] ?? 'r?';
+
+    return "{$even}p/{$odd}n · {$sumCode} · {$consec} · {$rangeCode}";
+}

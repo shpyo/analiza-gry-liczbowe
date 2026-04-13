@@ -193,13 +193,13 @@ $postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hash
 
     <table style="width:auto; background:none; border:none;">
         <tr>
-            <td><label title="Suma wszystkich <?= $pickCount ?> liczb w kuponie. Zmień zakres aby zawęzić generowane kupony.">Suma min:</label></td>
+            <td><label><?= render_tooltip('sum_total', $game) ?> min:</label></td>
             <td><input type="number" name="sum_min" value="<?= h((string)$def['sum_min']) ?>" min="0" max="999" style="width:80px;"></td>
-            <td><label title="Suma wszystkich <?= $pickCount ?> liczb w kuponie. Zmień zakres aby zawęzić generowane kupony.">Suma max:</label></td>
+            <td><label><?= render_tooltip('sum_total', $game) ?> max:</label></td>
             <td><input type="number" name="sum_max" value="<?= h((string)$def['sum_max']) ?>" min="0" max="999" style="width:80px;"></td>
         </tr>
         <tr>
-            <td><label title="Ile liczb parzystych (2,4,6...) w kuponie. Rozkład historyczny: najczęściej połowa lub blisko połowy.">Parzyste min:</label></td>
+            <td><label><?= render_tooltip('even_count', $game) ?> min:</label></td>
             <td>
                 <select name="even_min">
                     <?php for ($i = 0; $i <= $pickCount; $i++): ?>
@@ -207,7 +207,7 @@ $postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hash
                     <?php endfor; ?>
                 </select>
             </td>
-            <td><label title="Ile liczb parzystych (2,4,6...) w kuponie. Rozkład historyczny: najczęściej połowa lub blisko połowy.">Parzyste max:</label></td>
+            <td><label><?= render_tooltip('even_count', $game) ?> max:</label></td>
             <td>
                 <select name="even_max">
                     <?php for ($i = 0; $i <= $pickCount; $i++): ?>
@@ -217,7 +217,7 @@ $postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hash
             </td>
         </tr>
         <tr>
-            <td><label title="Ile liczb z dolnej połowy puli (≤ <?= (int)$gameConfig['low_threshold'] ?>). Rozkład historyczny: najczęściej połowa lub blisko połowy.">Niskie min:</label></td>
+            <td><label><?= render_tooltip('low_count', $game) ?> min:</label></td>
             <td>
                 <select name="low_min">
                     <?php for ($i = 0; $i <= $pickCount; $i++): ?>
@@ -225,7 +225,7 @@ $postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hash
                     <?php endfor; ?>
                 </select>
             </td>
-            <td><label title="Ile liczb z dolnej połowy puli (≤ <?= (int)$gameConfig['low_threshold'] ?>). Rozkład historyczny: najczęściej połowa lub blisko połowy.">Niskie max:</label></td>
+            <td><label><?= render_tooltip('low_count', $game) ?> max:</label></td>
             <td>
                 <select name="low_max">
                     <?php for ($i = 0; $i <= $pickCount; $i++): ?>
@@ -235,7 +235,7 @@ $postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hash
             </td>
         </tr>
         <tr>
-            <td><label title="Maksymalna liczba par kolejnych liczb (np. 7,8 lub 23,24). 0 = brak par kolejnych.">Maks. kolejnych par:</label></td>
+            <td><label><?= render_tooltip('consecutive', $game) ?> maks.:</label></td>
             <td>
                 <select name="consec_max">
                     <?php for ($i = 0; $i < $pickCount; $i++): ?>
@@ -243,7 +243,7 @@ $postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hash
                     <?php endfor; ?>
                 </select>
             </td>
-            <td><label title="Minimalna liczba gorących liczb (top-10 z ostatnich 500 losowań) w kuponie.">Min. gorących (top-10):</label></td>
+            <td><label><abbr title="Minimalna liczba gorących liczb (top-10 z ostatnich 500 losowań) w kuponie.">Min. gorących (top-10) ?</abbr></label></td>
             <td>
                 <select name="hot_min">
                     <?php for ($i = 0; $i <= $pickCount; $i++): ?>
@@ -253,7 +253,7 @@ $postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hash
             </td>
         </tr>
         <tr>
-            <td><label title="Ile liczb może kończyć się tą samą cyfrą (np. 3,13,23,33 – wszystkie kończą się 3). Brak ograniczenia: <?= $pickCount ?>.">Maks. tych samych ostatnich cyfr:</label></td>
+            <td><label><?= render_tooltip('last_digit_unique', $game) ?> maks.:</label></td>
             <td>
                 <select name="last_digit_max">
                     <?php for ($i = 1; $i <= $pickCount; $i++): ?>
@@ -261,7 +261,7 @@ $postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hash
                     <?php endfor; ?>
                 </select>
             </td>
-            <td><label>Liczba kuponów:</label></td>
+            <td><label><abbr title="Ile kuponów wygenerować jednorazowo (od 1 do 20).">Liczba kuponów do wygenerowania (1–20) ?</abbr></label></td>
             <td>
                 <select name="count">
                     <?php foreach ([1,2,3,5,10,15,20] as $c): ?>
@@ -271,7 +271,7 @@ $postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hash
             </td>
         </tr>
         <tr>
-            <td><label title="Maksymalna liczba liczb z jednej dziesiątki (np. max 2 z zakresu 10–19). Zmniejsza skupienie liczb w jednym przedziale.">Maks. z jednej dziesiątki:</label></td>
+            <td><label><?= render_tooltip('decades_used', $game) ?> maks. z jednej:</label></td>
             <td><input type="number" name="decades_max" value="<?= h((string)$def['decades_max']) ?>" min="1" max="<?= $pickCount ?>" style="width:60px;"></td>
             <td colspan="2"><small style="color:#555;">Ogranicza skupienie liczb w jednym przedziale (1–9, 10–19, 20–29 itd.)</small></td>
         </tr>
@@ -279,17 +279,17 @@ $postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hash
 
     <?php if (!empty($profileHashes)): ?>
     <div style="margin-top:10px;">
-        <label>Profile (opcjonalnie, Ctrl+klik dla wielu):</label><br>
-        <select name="profile_hashes[]" multiple size="6" style="width:400px;">
+        <label><?= render_tooltip('profile_hash', $game) ?> (opcjonalnie, Ctrl+klik dla wielu):</label><br>
+        <select name="profile_hashes[]" multiple size="6" style="width:500px;">
             <?php foreach ($profileHashes as $ph): ?>
                 <option value="<?= h($ph['profile_hash']) ?>"
                     <?= in_array($ph['profile_hash'], $postedHashes, true) ? 'selected' : '' ?>>
-                    <?= h($ph['profile_hash']) ?>
-                    (<?= h((string)$ph['total_draws']) ?> × / <?= h((string)$ph['pct_of_total']) ?>%)
+                    <?= h(describe_profile_short($ph['profile_hash'])) ?>
+                    &nbsp;&nbsp;(<?= h((string)$ph['total_draws']) ?>× / <?= h((string)$ph['pct_of_total']) ?>%)
                 </option>
             <?php endforeach; ?>
         </select>
-        <small style="display:block;color:#555;margin-top:4px;">Profil to strukturalny wzorzec losowania. Wybierz jeden lub więcej profili aby generować tylko kupony o danym charakterze.<br>Format: {parzyste}e{nieparzyste}o_{niskie}l{wysokie}h_s{zakres sumy}_c{kolejne}_r{rozstęp}</small>
+        <small style="display:block;color:#555;margin-top:4px;">Wybierz jeden lub kilka profilów, aby generator tworzył tylko kupony o danym charakterze strukturalnym.</small>
     </div>
     <?php endif; ?>
 
@@ -317,12 +317,122 @@ $postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hash
     <br>
     <small>
         Suma: <?= h((string)$r['metrics']['sum_total']) ?> &nbsp;|&nbsp;
-        Par.: <?= h((string)$r['metrics']['even_count']) ?> &nbsp;|&nbsp;
+        Parzyste: <?= h((string)$r['metrics']['even_count']) ?> &nbsp;|&nbsp;
         Niskie: <?= h((string)$r['metrics']['low_count']) ?> &nbsp;|&nbsp;
-        Kol.: <?= h((string)$r['metrics']['consecutive']) ?> &nbsp;|&nbsp;
-        Cyfry: <?= h((string)$r['metrics']['last_digit_unique']) ?> &nbsp;|&nbsp;
-        Profil: <code><?= h($r['hash']) ?></code>
+        Pary sąsiadów: <?= h((string)$r['metrics']['consecutive']) ?> &nbsp;|&nbsp;
+        Cyfry jedności: <?= h((string)$r['metrics']['last_digit_unique']) ?> &nbsp;|&nbsp;
+        Profil: <?= h(describe_profile_short($r['hash'])) ?>
     </small>
+
+    <?php
+    // Zbieramy tylko aktywne filtry (różne od domyślnych)
+    $defaultSumMin  = 0;
+    $defaultSumMax  = $poolSize * $pickCount;
+    $defaultEvenMin = 0;
+    $defaultEvenMax = $pickCount;
+    $defaultLowMin  = 0;
+    $defaultLowMax  = $pickCount;
+    $defaultConsec  = $pickCount - 1;
+    $defaultHotMin  = 0;
+    $defaultLastDig = $pickCount;
+    $activeFilters  = [];
+
+    if ($sumMin > $defaultSumMin || $sumMax < $defaultSumMax) {
+        $activeFilters[] = [
+            'label'  => metric_label('sum_total'),
+            'value'  => $r['metrics']['sum_total'],
+            'range'  => "{$sumMin}–{$sumMax}",
+            'ok'     => ($r['metrics']['sum_total'] >= $sumMin && $r['metrics']['sum_total'] <= $sumMax),
+        ];
+    } else {
+        // Suma zawsze pokazywana jako podstawowa informacja
+        $activeFilters[] = [
+            'label'  => metric_label('sum_total'),
+            'value'  => $r['metrics']['sum_total'],
+            'range'  => '—',
+            'ok'     => true,
+        ];
+    }
+    if ($evenMin > $defaultEvenMin || $evenMax < $defaultEvenMax) {
+        $activeFilters[] = [
+            'label'  => metric_label('even_count'),
+            'value'  => $r['metrics']['even_count'],
+            'range'  => "{$evenMin}–{$evenMax}",
+            'ok'     => ($r['metrics']['even_count'] >= $evenMin && $r['metrics']['even_count'] <= $evenMax),
+        ];
+    }
+    if ($lowMin > $defaultLowMin || $lowMax < $defaultLowMax) {
+        $activeFilters[] = [
+            'label'  => metric_label('low_count'),
+            'value'  => $r['metrics']['low_count'],
+            'range'  => "{$lowMin}–{$lowMax}",
+            'ok'     => ($r['metrics']['low_count'] >= $lowMin && $r['metrics']['low_count'] <= $lowMax),
+        ];
+    }
+    if ($consecMax < $defaultConsec) {
+        $activeFilters[] = [
+            'label'  => metric_label('consecutive'),
+            'value'  => $r['metrics']['consecutive'],
+            'range'  => "maks. {$consecMax}",
+            'ok'     => ($r['metrics']['consecutive'] <= $consecMax),
+        ];
+    }
+    if ($lastDigMax < $defaultLastDig) {
+        $activeFilters[] = [
+            'label'  => metric_label('last_digit_unique'),
+            'value'  => $r['metrics']['last_digit_unique'],
+            'range'  => "maks. {$lastDigMax}",
+            'ok'     => ($r['metrics']['last_digit_unique'] <= $lastDigMax),
+        ];
+    }
+    if ($hotMin > $defaultHotMin) {
+        $hotInCoupon = count(array_intersect($r['numbers'], $top10));
+        $activeFilters[] = [
+            'label'  => 'Gorące (top-10)',
+            'value'  => $hotInCoupon,
+            'range'  => "min. {$hotMin}",
+            'ok'     => ($hotInCoupon >= $hotMin),
+        ];
+    }
+    if (!empty($wantedHashes)) {
+        $activeFilters[] = [
+            'label'  => metric_label('profile_hash'),
+            'value'  => describe_profile_short($r['hash']),
+            'range'  => '(wybrany)',
+            'ok'     => in_array($r['hash'], $wantedHashes, true),
+        ];
+    } else {
+        $activeFilters[] = [
+            'label'  => metric_label('profile_hash'),
+            'value'  => describe_profile_short($r['hash']),
+            'range'  => '—',
+            'ok'     => true,
+        ];
+    }
+    ?>
+    <details style="margin-top:8px;">
+        <summary style="cursor:pointer;font-size:0.85em;color:#1a3a6b;">Dlaczego te liczby?</summary>
+        <table style="margin-top:6px;font-size:0.85em;width:auto;background:none;">
+            <thead>
+                <tr>
+                    <th style="background:#e8edf5;color:#1a3a6b;padding:4px 10px;">Filtr</th>
+                    <th style="background:#e8edf5;color:#1a3a6b;padding:4px 10px;">Wartość kuponu</th>
+                    <th style="background:#e8edf5;color:#1a3a6b;padding:4px 10px;">Zakres filtra</th>
+                    <th style="background:#e8edf5;color:#1a3a6b;padding:4px 10px;">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($activeFilters as $af): ?>
+                <tr>
+                    <td style="padding:3px 10px;"><?= h($af['label']) ?></td>
+                    <td style="padding:3px 10px;"><?= h((string)$af['value']) ?></td>
+                    <td style="padding:3px 10px;color:#555;"><?= h($af['range']) ?></td>
+                    <td style="padding:3px 10px;"><?= $af['ok'] ? '✓' : '✗' ?></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </details>
 </div>
 <?php endforeach; ?>
 

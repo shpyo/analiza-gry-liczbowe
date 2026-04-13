@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/texts.php';
 require_once __DIR__ . '/helpers.php';
 
 // -----------------------------------------------------------------------
@@ -75,8 +76,8 @@ button:hover, input[type=submit]:hover { background: #2a5a9b; }
         <?= nav_link('Statystyki', 'stats', $game, $page, $game) ?>
         <?= nav_link('Generator', 'generator', $game, $page, $game) ?>
         <?= nav_link('Weryfikator', 'validator', $game, $page, $game) ?>
-        <?= nav_link('Sync', 'sync', $game, $page, $game) ?>
-        <?= nav_link('Import', 'import', $game, $page, $game) ?>
+        <?= nav_link(NAV_LABELS['sync'], 'sync', $game, $page, $game) ?>
+        <?= nav_link(NAV_LABELS['import'], 'import', $game, $page, $game) ?>
     </span>
     <span class="game-selector">
         <?php foreach ($gameNames as $slug => $name): ?>

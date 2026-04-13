@@ -299,29 +299,18 @@ $_legendLabels = ['rzadko', '', 'średnio', '', 'często'];
 <?php endfor; ?>
 </div>
 
-<div style="background:#fff;border:1px solid #ddd;padding:12px 18px;margin-bottom:15px;border-radius:4px;font-size:0.9em;">
-  <strong>📖 Objaśnienie kolumn:</strong>
-  <ul style="margin:6px 0 0 0;padding-left:18px;">
-    <li><strong>Łącznie</strong> – całkowita liczba wystąpień tej liczby w historii</li>
-    <li><strong>Ost. 500</strong> – wystąpienia w ostatnich 500 losowaniach (domyślne okno hot/cold)</li>
-    <li><strong>Temp.</strong> – temperatura: 🔥 Gorąca (często), ~ Letnia (przeciętnie), ❄ Zimna (rzadko)</li>
-    <li><strong>Przerwa</strong> – ile losowań minęło od ostatniego wystąpienia (aktualny gap)</li>
-    <li><strong>Śr. interw.</strong> – średnio co ile losowań ta liczba pada (historia / częstość)</li>
-    <li><strong>Zaległość</strong> – przerwa ÷ średni interwał; &gt;1.0 = czeka dłużej niż zwykle; &gt;2.0 = mocno zalega</li>
-  </ul>
-</div>
 
 <table>
     <thead>
         <tr>
             <th><a href="<?= h(stats_sort_url('num')) ?>" style="color:#fff;"><abbr title="Kliknij nagłówek kolumny aby posortować tabelę">Liczba↕</abbr><?= sort_arrow('num') ?></a></th>
-            <th><a href="<?= h(stats_sort_url('total_freq')) ?>" style="color:#fff;"><abbr title="Ile razy ta liczba padła w całej historii losowań (w wybranym przedziale dat)">Łącznie↕</abbr><?= sort_arrow('total_freq') ?></a></th>
-            <th><a href="<?= h(stats_sort_url('window_freq')) ?>" style="color:#fff;"><abbr title="Ile razy ta liczba padła w ostatnich 500 losowaniach (okno czasowe dla hot/cold)">Ost. 500↕</abbr><?= sort_arrow('window_freq') ?></a></th>
-            <th>Temp.</th>
+            <th><a href="<?= h(stats_sort_url('total_freq')) ?>" style="color:#fff;"><?= render_tooltip('total_freq', $game) ?><?= sort_arrow('total_freq') ?></a></th>
+            <th><a href="<?= h(stats_sort_url('window_freq')) ?>" style="color:#fff;"><?= render_tooltip('window_freq', $game) ?><?= sort_arrow('window_freq') ?></a></th>
+            <th>Temperatura</th>
             <th><a href="<?= h(stats_sort_url('last_seen_draw')) ?>" style="color:#fff;"><abbr title="Numer ostatniego losowania, w którym ta liczba padła">Ostatnio↕</abbr><?= sort_arrow('last_seen_draw') ?></a></th>
-            <th><a href="<?= h(stats_sort_url('current_gap')) ?>" style="color:#fff;"><abbr title="Ile losowań minęło od ostatniego wystąpienia tej liczby (aktualny gap)">Przerwa↕</abbr><?= sort_arrow('current_gap') ?></a></th>
-            <th><a href="<?= h(stats_sort_url('avg_interval')) ?>" style="color:#fff;"><abbr title="Średnia liczba losowań między kolejnymi wystąpieniami tej liczby (całkowita historia ÷ częstość)">Śr. interw.↕</abbr><?= sort_arrow('avg_interval') ?></a></th>
-            <th><a href="<?= h(stats_sort_url('overdue_score')) ?>" style="color:#fff;"><abbr title="Wskaźnik zaległości = aktualna przerwa ÷ średni interwał. Wartość &gt; 1.0 = liczba czeka dłużej niż zwykle. Wartość &gt; 2.0 = mocno zalega.">Zaległość↕</abbr><?= sort_arrow('overdue_score') ?></a></th>
+            <th><a href="<?= h(stats_sort_url('current_gap')) ?>" style="color:#fff;"><?= render_tooltip('current_gap', $game) ?><?= sort_arrow('current_gap') ?></a></th>
+            <th><a href="<?= h(stats_sort_url('avg_interval')) ?>" style="color:#fff;"><?= render_tooltip('avg_interval', $game) ?><?= sort_arrow('avg_interval') ?></a></th>
+            <th><a href="<?= h(stats_sort_url('overdue_score')) ?>" style="color:#fff;"><?= render_tooltip('overdue_score', $game) ?><?= sort_arrow('overdue_score') ?></a></th>
         </tr>
     </thead>
     <tbody>

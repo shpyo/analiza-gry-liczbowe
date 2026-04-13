@@ -28,12 +28,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     for ($i = 1; $i <= $pickCount; $i++) {
         $raw = isset($_POST["n{$i}"]) ? trim($_POST["n{$i}"]) : '';
         if ($raw === '' || !ctype_digit($raw)) {
-            $errors[] = "Pole n{$i} musi być liczbą całkowitą.";
+            $errors[] = "Liczba {$i} musi być liczbą całkowitą.";
             continue;
         }
         $val = (int)$raw;
         if ($val < 1 || $val > $poolSize) {
-            $errors[] = "Liczba n{$i} ({$val}) musi być w zakresie 1–{$poolSize}.";
+            $errors[] = "Liczba {$i} ({$val}) musi być w zakresie 1–{$poolSize}.";
             continue;
         }
         $inputNums[] = $val;
@@ -88,7 +88,7 @@ $totalDraws = (int)$pdo->query("SELECT COUNT(*) FROM `{$drawsTable}`")->fetchCol
     <p><small style="color:#555;">Wpisz liczby w dowolnej kolejności — zostaną automatycznie posortowane.</small></p>
     <p>
         <?php for ($i = 1; $i <= $pickCount; $i++): ?>
-            <label>n<?= $i ?>:
+            <label>Liczba <?= $i ?>:
                 <input type="number"
                        name="n<?= $i ?>"
                        min="1" max="<?= h((string)$poolSize) ?>"
@@ -121,17 +121,17 @@ $totalDraws = (int)$pdo->query("SELECT COUNT(*) FROM `{$drawsTable}`")->fetchCol
 <h3>Metryki</h3>
 <table style="width:auto;">
     <tr><th>Metryka</th><th>Wartość</th></tr>
-    <tr><td title="Suma wszystkich liczb w kombinacji.">Suma</td>                    <td><?= h((string)$metrics['sum_total']) ?></td></tr>
-    <tr><td title="Ile liczb w kombinacji jest parzystych (2,4,6,...)">Parzyste</td>                <td><?= h((string)$metrics['even_count']) ?></td></tr>
-    <tr><td title="Ile liczb jest nieparzystych (1,3,5,...)">Nieparzyste</td>             <td><?= h((string)($pickCount - $metrics['even_count'])) ?></td></tr>
-    <tr><td title="Ile liczb jest w dolnej połowie puli">Niskie (≤ <?= (int)$gameConfig['low_threshold'] ?>)</td>
+    <tr><td><?= render_tooltip('sum_total', $game) ?></td>                       <td><?= h((string)$metrics['sum_total']) ?></td></tr>
+    <tr><td><?= render_tooltip('even_count', $game) ?></td>                     <td><?= h((string)$metrics['even_count']) ?></td></tr>
+    <tr><td><?= render_tooltip('odd_count', $game) ?></td>                      <td><?= h((string)($pickCount - $metrics['even_count'])) ?></td></tr>
+    <tr><td><?= render_tooltip('low_count', $game) ?> (≤ <?= (int)$gameConfig['low_threshold'] ?>)</td>
                                          <td><?= h((string)$metrics['low_count']) ?></td></tr>
-    <tr><td title="Ile liczb jest w górnej połowie puli">Wysokie</td>                 <td><?= h((string)($pickCount - $metrics['low_count'])) ?></td></tr>
-    <tr><td title="Ile par sąsiadujących liczb (np. 7 i 8, lub 34 i 35)">Pary kolejnych</td>          <td><?= h((string)$metrics['consecutive']) ?></td></tr>
-    <tr><td title="Z ilu różnych dziesiątek (1–9, 10–19, 20–29...) pochodzi ta kombinacja">Użyte dziesiątki</td>        <td><?= h((string)$metrics['decades_used']) ?></td></tr>
-    <tr><td title="Różnica między największą a najmniejszą liczbą w kombinacji">Rozpiętość</td>              <td><?= h((string)$metrics['range_spread']) ?></td></tr>
-    <tr><td title="Ile różnych cyfr jedności (0–9) zawiera kombinacja">Unikalne ostatnie cyfry</td> <td><?= h((string)$metrics['last_digit_unique']) ?></td></tr>
-    <tr><th title="Strukturalny odcisk palca tej kombinacji — identyczny dla kombinacji o tym samym układzie parzystości, niskich/wysokich, sumy i rozstępu">Profil (hash)</th>           <td><code><?= h($hash) ?></code></td></tr>
+    <tr><td><?= render_tooltip('high_count', $game) ?></td>                     <td><?= h((string)($pickCount - $metrics['low_count'])) ?></td></tr>
+    <tr><td><?= render_tooltip('consecutive', $game) ?></td>                    <td><?= h((string)$metrics['consecutive']) ?></td></tr>
+    <tr><td><?= render_tooltip('decades_used', $game) ?></td>                   <td><?= h((string)$metrics['decades_used']) ?></td></tr>
+    <tr><td><?= render_tooltip('range_spread', $game) ?></td>                   <td><?= h((string)$metrics['range_spread']) ?></td></tr>
+    <tr><td><?= render_tooltip('last_digit_unique', $game) ?></td>              <td><?= h((string)$metrics['last_digit_unique']) ?></td></tr>
+    <tr><th><?= render_tooltip('profile_hash', $game) ?></th>                   <td><?= h(describe_profile($hash, $game)) ?></td></tr>
 </table>
 
 <h3>Profil w bazie</h3>
@@ -144,11 +144,39 @@ $totalDraws = (int)$pdo->query("SELECT COUNT(*) FROM `{$drawsTable}`")->fetchCol
     </div>
 <?php elseif ($totalDraws > 0): ?>
     <div class="alert alert-error">
-        Ten profil (<code><?= h($hash) ?></code>) <strong>nigdy nie wystąpił</strong> w historii losowań.
+        Ten profil <strong>nigdy nie wystąpił</strong> w historii losowań.
     </div>
 <?php else: ?>
     <div class="alert">Brak danych w bazie (import niewykonany).</div>
 <?php endif; ?>
+
+<h3>Co to znaczy?</h3>
+<div style="background:#fff;border:1px solid #ddd;padding:12px 18px;border-radius:4px;margin-bottom:15px;">
+    <p style="margin:0 0 8px 0;">
+        <strong>Profil strukturalny:</strong> <?= h(describe_profile($hash, $game)) ?>
+    </p>
+    <?php if ($profileRow): ?>
+        <?php $pct = (float)$profileRow['pct_of_total']; ?>
+        <p style="margin:0 0 8px 0;">
+            <?php if ($pct > 2.0): ?>
+                <strong>Popularność wzorca: popularny</strong> — ten układ strukturalny padał w <?= h((string)$profileRow['pct_of_total']) ?>% wszystkich losowań. Jest to jeden z częstszych wzorców.
+            <?php elseif ($pct >= 0.5): ?>
+                <strong>Popularność wzorca: rzadki</strong> — ten układ strukturalny padał w <?= h((string)$profileRow['pct_of_total']) ?>% wszystkich losowań. Wzorzec niezbyt powszechny.
+            <?php else: ?>
+                <strong>Popularność wzorca: bardzo rzadki</strong> — ten układ strukturalny padał zaledwie w <?= h((string)$profileRow['pct_of_total']) ?>% wszystkich losowań.
+            <?php endif; ?>
+        </p>
+    <?php elseif ($totalDraws > 0): ?>
+        <p style="margin:0 0 8px 0;"><strong>Popularność wzorca:</strong> ten wzorzec strukturalny nigdy nie padł w historii <?= h($gameName) ?>.</p>
+    <?php endif; ?>
+    <p style="margin:0;">
+        <?php if ($exactMatch): ?>
+            Ta kombinacja padła już raz — dnia <strong><?= h($exactMatch['draw_date']) ?></strong> (losowanie #<?= h((string)$exactMatch['draw_number']) ?>).
+        <?php else: ?>
+            Ta kombinacja nigdy nie padła w historii <?= h($gameName) ?>.
+        <?php endif; ?>
+    </p>
+</div>
 
 <h3>Dokładna kombinacja</h3>
 <?php if ($exactMatch): ?>
