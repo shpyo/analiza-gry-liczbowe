@@ -83,10 +83,9 @@ foreach ($numberCols as $col) {
 $unionTotalSQL = implode(' UNION ALL ', $unionTotalParts);
 
 // Execute total freq
-$allDateParams = array_merge(...(count($dateParams) > 0 ? array_fill(0, $pickCount, $dateParams) : [[]]));
-if (empty($allDateParams)) {
-    $allDateParams = [];
-}
+$allDateParams = count($dateParams) > 0
+    ? array_merge(...array_fill(0, $pickCount, $dateParams))
+    : [];
 
 $totalFreqStmt = $pdo->prepare(
     "SELECT num, COUNT(*) AS freq FROM ({$unionTotalSQL}) AS t WHERE num IS NOT NULL GROUP BY num"
