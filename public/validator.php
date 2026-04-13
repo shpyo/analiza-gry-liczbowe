@@ -80,9 +80,12 @@ $totalDraws = (int)$pdo->query("SELECT COUNT(*) FROM `{$drawsTable}`")->fetchCol
 ?>
 <h1><?= h($gameName) ?> &mdash; Weryfikator kombinacji</h1>
 
+<p style="color:#555;">Wpisz kombinację <?= $pickCount ?> liczb z zakresu 1–<?= $poolSize ?>. System obliczy profil statystyczny, sprawdzi jak często taki wzorzec padał historycznie i czy ta dokładna kombinacja kiedykolwiek wypadła.</p>
+
 <form method="post" action="">
     <input type="hidden" name="page" value="validator">
     <input type="hidden" name="game" value="<?= h($game) ?>">
+    <p><small style="color:#555;">Wpisz liczby w dowolnej kolejności — zostaną automatycznie posortowane.</small></p>
     <p>
         <?php for ($i = 1; $i <= $pickCount; $i++): ?>
             <label>n<?= $i ?>:
@@ -118,17 +121,17 @@ $totalDraws = (int)$pdo->query("SELECT COUNT(*) FROM `{$drawsTable}`")->fetchCol
 <h3>Metryki</h3>
 <table style="width:auto;">
     <tr><th>Metryka</th><th>Wartość</th></tr>
-    <tr><td>Suma</td>                    <td><?= h((string)$metrics['sum_total']) ?></td></tr>
-    <tr><td>Parzyste</td>                <td><?= h((string)$metrics['even_count']) ?></td></tr>
-    <tr><td>Nieparzyste</td>             <td><?= h((string)($pickCount - $metrics['even_count'])) ?></td></tr>
-    <tr><td>Niskie (≤ <?= (int)$gameConfig['low_threshold'] ?>)</td>
+    <tr><td title="Suma wszystkich liczb. Dla Lotto 6/49 zakres to 21–279, typowy zakres to 110–170 (68% losowań).">Suma</td>                    <td><?= h((string)$metrics['sum_total']) ?></td></tr>
+    <tr><td title="Ile liczb w kombinacji jest parzystych (2,4,6,...)">Parzyste</td>                <td><?= h((string)$metrics['even_count']) ?></td></tr>
+    <tr><td title="Ile liczb jest nieparzystych (1,3,5,...)">Nieparzyste</td>             <td><?= h((string)($pickCount - $metrics['even_count'])) ?></td></tr>
+    <tr><td title="Ile liczb jest w dolnej połowie puli">Niskie (≤ <?= (int)$gameConfig['low_threshold'] ?>)</td>
                                          <td><?= h((string)$metrics['low_count']) ?></td></tr>
-    <tr><td>Wysokie</td>                 <td><?= h((string)($pickCount - $metrics['low_count'])) ?></td></tr>
-    <tr><td>Pary kolejnych</td>          <td><?= h((string)$metrics['consecutive']) ?></td></tr>
-    <tr><td>Użyte dziesiątki</td>        <td><?= h((string)$metrics['decades_used']) ?></td></tr>
-    <tr><td>Rozpiętość</td>              <td><?= h((string)$metrics['range_spread']) ?></td></tr>
-    <tr><td>Unikalne ostatnie cyfry</td> <td><?= h((string)$metrics['last_digit_unique']) ?></td></tr>
-    <tr><th>Profil (hash)</th>           <td><code><?= h($hash) ?></code></td></tr>
+    <tr><td title="Ile liczb jest w górnej połowie puli">Wysokie</td>                 <td><?= h((string)($pickCount - $metrics['low_count'])) ?></td></tr>
+    <tr><td title="Ile par sąsiadujących liczb (np. 7 i 8, lub 34 i 35)">Pary kolejnych</td>          <td><?= h((string)$metrics['consecutive']) ?></td></tr>
+    <tr><td title="Z ilu różnych dziesiątek (1–9, 10–19, 20–29...) pochodzi ta kombinacja">Użyte dziesiątki</td>        <td><?= h((string)$metrics['decades_used']) ?></td></tr>
+    <tr><td title="Różnica między największą a najmniejszą liczbą w kombinacji">Rozpiętość</td>              <td><?= h((string)$metrics['range_spread']) ?></td></tr>
+    <tr><td title="Ile różnych cyfr jedności (0–9) zawiera kombinacja">Unikalne ostatnie cyfry</td> <td><?= h((string)$metrics['last_digit_unique']) ?></td></tr>
+    <tr><th title="Strukturalny odcisk palca tej kombinacji — identyczny dla kombinacji o tym samym układzie parzystości, niskich/wysokich, sumy i rozstępu">Profil (hash)</th>           <td><code><?= h($hash) ?></code></td></tr>
 </table>
 
 <h3>Profil w bazie</h3>

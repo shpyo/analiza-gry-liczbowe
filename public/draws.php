@@ -99,6 +99,14 @@ function draws_url(array $overrides = []): string
 <p>Znaleziono: <strong><?= h((string)$totalRows) ?></strong> losowań &mdash;
    Strona <?= h((string)$currentPage) ?> / <?= h((string)$totalPages) ?></p>
 
+<div style="background:#fff;border:1px solid #ddd;padding:10px 18px;margin-bottom:12px;border-radius:4px;font-size:0.85em;color:#555;">
+  <strong>ℹ️ Legenda:</strong>
+  <strong>Par.</strong> = parzyste liczby w losowaniu &nbsp;|&nbsp;
+  <strong>Niskie</strong> = liczby w dolnej połowie puli (≤ próg gry) &nbsp;|&nbsp;
+  <strong>Rozstęp</strong> = różnica max – min &nbsp;|&nbsp;
+  <strong>Profil</strong> = strukturalny wzorzec losowania (kliknij kod aby zobaczyć statystyki profilu)
+</div>
+
 <?php if (empty($rows)): ?>
 <div class="alert alert-error">Brak losowań spełniających kryteria.</div>
 <?php else: ?>
@@ -113,9 +121,10 @@ function draws_url(array $overrides = []): string
             <th>Plus</th>
             <?php endif; ?>
             <th>Suma</th>
-            <th>Par.</th>
-            <th>Niskie</th>
-            <th>Profil</th>
+            <th><abbr title="Ile liczb w tym losowaniu jest parzystych (2, 4, 6 itd.)">Par.</abbr></th>
+            <th><abbr title="Ile liczb jest niskich (dla Lotto: 1–24; dla Mini Lotto: 1–21)">Niskie</abbr></th>
+            <th><abbr title="Różnica między największą a najmniejszą liczbą w losowaniu (max - min)">Rozstęp</abbr></th>
+            <th><abbr title="Strukturalny odcisk palca losowania: ile parzystych/nieparzystych, niskich/wysokich, zakres sumy i rozstępu. Pomaga identyfikować wzorce niezależnie od konkretnych liczb.">Profil</abbr></th>
         </tr>
     </thead>
     <tbody>
@@ -138,6 +147,7 @@ function draws_url(array $overrides = []): string
             <td><?= h((string)$row['sum_total']) ?></td>
             <td><?= h((string)$row['even_count']) ?></td>
             <td><?= h((string)$row['low_count']) ?></td>
+            <td><?= h((string)$row['range_spread']) ?></td>
             <td><small><code><?= h((string)$row['profile_hash']) ?></code></small></td>
         </tr>
     <?php endforeach; ?>

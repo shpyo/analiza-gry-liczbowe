@@ -203,16 +203,29 @@ function sort_arrow(string $col): string
 <p>Łącznie losowań: <strong><?= h((string)$totalDraws) ?></strong> &mdash;
    Ostatni numer: <strong><?= h((string)$maxDrawNum) ?></strong></p>
 
+<div style="background:#fff;border:1px solid #ddd;padding:12px 18px;margin-bottom:15px;border-radius:4px;font-size:0.9em;">
+  <strong>📖 Objaśnienie kolumn:</strong>
+  <ul style="margin:6px 0 0 0;padding-left:18px;">
+    <li><strong>Łącznie</strong> – całkowita liczba wystąpień tej liczby w historii</li>
+    <li><strong>Ost. 500</strong> – wystąpienia w ostatnich 500 losowaniach (domyślne okno hot/cold)</li>
+    <li><strong>Temp.</strong> – temperatura: 🔥 Gorąca (często), ~ Letnia (przeciętnie), ❄ Zimna (rzadko)</li>
+    <li><strong>Przerwa</strong> – ile losowań minęło od ostatniego wystąpienia (aktualny gap)</li>
+    <li><strong>Śr. interw.</strong> – średnio co ile losowań ta liczba pada (historia / częstość)</li>
+    <li><strong>Zaległość</strong> – przerwa ÷ średni interwał; &gt;1.0 = czeka dłużej niż zwykle; &gt;2.0 = mocno zalega</li>
+  </ul>
+</div>
+
 <table>
     <thead>
         <tr>
-            <th><a href="<?= h(stats_sort_url('num')) ?>" style="color:#fff;">Liczba<?= sort_arrow('num') ?></a></th>
-            <th><a href="<?= h(stats_sort_url('total_freq')) ?>" style="color:#fff;">Łącznie<?= sort_arrow('total_freq') ?></a></th>
-            <th><a href="<?= h(stats_sort_url('window_freq')) ?>" style="color:#fff;">Ost. 500<?= sort_arrow('window_freq') ?></a></th>
-            <th><a href="<?= h(stats_sort_url('last_seen_draw')) ?>" style="color:#fff;">Ostatnio (nr)<?= sort_arrow('last_seen_draw') ?></a></th>
-            <th><a href="<?= h(stats_sort_url('current_gap')) ?>" style="color:#fff;">Przerwa<?= sort_arrow('current_gap') ?></a></th>
-            <th><a href="<?= h(stats_sort_url('avg_interval')) ?>" style="color:#fff;">Śr. interw.<?= sort_arrow('avg_interval') ?></a></th>
-            <th><a href="<?= h(stats_sort_url('overdue_score')) ?>" style="color:#fff;">Zaległość<?= sort_arrow('overdue_score') ?></a></th>
+            <th><a href="<?= h(stats_sort_url('num')) ?>" style="color:#fff;"><abbr title="Kliknij nagłówek kolumny aby posortować tabelę">Liczba↕</abbr><?= sort_arrow('num') ?></a></th>
+            <th><a href="<?= h(stats_sort_url('total_freq')) ?>" style="color:#fff;"><abbr title="Ile razy ta liczba padła w całej historii losowań (w wybranym przedziale dat)">Łącznie↕</abbr><?= sort_arrow('total_freq') ?></a></th>
+            <th><a href="<?= h(stats_sort_url('window_freq')) ?>" style="color:#fff;"><abbr title="Ile razy ta liczba padła w ostatnich 500 losowaniach (okno czasowe dla hot/cold)">Ost. 500↕</abbr><?= sort_arrow('window_freq') ?></a></th>
+            <th>Temp.</th>
+            <th><a href="<?= h(stats_sort_url('last_seen_draw')) ?>" style="color:#fff;"><abbr title="Numer ostatniego losowania, w którym ta liczba padła">Ostatnio↕</abbr><?= sort_arrow('last_seen_draw') ?></a></th>
+            <th><a href="<?= h(stats_sort_url('current_gap')) ?>" style="color:#fff;"><abbr title="Ile losowań minęło od ostatniego wystąpienia tej liczby (aktualny gap)">Przerwa↕</abbr><?= sort_arrow('current_gap') ?></a></th>
+            <th><a href="<?= h(stats_sort_url('avg_interval')) ?>" style="color:#fff;"><abbr title="Średnia liczba losowań między kolejnymi wystąpieniami tej liczby (całkowita historia ÷ częstość)">Śr. interw.↕</abbr><?= sort_arrow('avg_interval') ?></a></th>
+            <th><a href="<?= h(stats_sort_url('overdue_score')) ?>" style="color:#fff;"><abbr title="Wskaźnik zaległości = aktualna przerwa ÷ średni interwał. Wartość &gt; 1.0 = liczba czeka dłużej niż zwykle. Wartość &gt; 2.0 = mocno zalega.">Zaległość↕</abbr><?= sort_arrow('overdue_score') ?></a></th>
         </tr>
     </thead>
     <tbody>
@@ -221,15 +234,34 @@ function sort_arrow(string $col): string
         $isHot  = $row['window_freq'] > $avgWindowFreq;
         $isCold = $row['window_freq'] < $avgWindowFreq && $row['window_freq'] > 0;
         $class  = $isHot ? 'hot' : ($isCold ? 'cold' : '');
+
+        if ($row['window_freq'] == 0) {
+            $tempLabel = '<span style="color:#95a5a6;" title="Nie padła w ostatnich 500 losowaniach">— Nieaktywna</span>';
+        } elseif ($row['window_freq'] > $avgWindowFreq * 1.2) {
+            $tempLabel = '<span style="color:#c0392b;font-weight:bold;" title="Gorąca — pojawia się częściej niż średnia w ostatnich 500 losowaniach">🔥 Gorąca</span>';
+        } elseif ($row['window_freq'] >= $avgWindowFreq * 0.8) {
+            $tempLabel = '<span style="color:#e67e22;font-weight:bold;" title="Umiarkowana — pojawia się zbliżoną do średniej częstością">~ Letnia</span>';
+        } else {
+            $tempLabel = '<span style="color:#2980b9;font-weight:bold;" title="Zimna — pojawia się rzadziej niż średnia w ostatnich 500 losowaniach">❄ Zimna</span>';
+        }
+
+        if ($row['overdue_score'] > 2.0) {
+            $overdueStyle = ' style="color:#c0392b;font-weight:bold;"';
+        } elseif ($row['overdue_score'] > 1.0) {
+            $overdueStyle = ' style="color:#e67e22;"';
+        } else {
+            $overdueStyle = '';
+        }
         ?>
         <tr>
             <td><span class="ball <?= $class ?>"><?= h((string)$row['num']) ?></span></td>
             <td class="<?= $class ?>"><?= h((string)$row['total_freq']) ?></td>
             <td class="<?= $class ?>"><?= h((string)$row['window_freq']) ?></td>
+            <td><?= $tempLabel ?></td>
             <td><?= $row['last_seen_draw'] > 0 ? h((string)$row['last_seen_draw']) : '—' ?></td>
             <td><?= h((string)$row['current_gap']) ?></td>
             <td><?= h((string)$row['avg_interval']) ?></td>
-            <td><?= h((string)$row['overdue_score']) ?></td>
+            <td<?= $overdueStyle ?>><?= h((string)$row['overdue_score']) ?></td>
         </tr>
     <?php endforeach; ?>
     </tbody>

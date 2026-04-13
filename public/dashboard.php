@@ -85,7 +85,7 @@ $totalDraws = (int)$pdo->query("SELECT COUNT(*) FROM `{$drawsTable}`")->fetchCol
         Suma: <?= h((string)$lastDraw['sum_total']) ?> &nbsp;|&nbsp;
         Parzyste: <?= h((string)$lastDraw['even_count']) ?> &nbsp;|&nbsp;
         Niskie: <?= h((string)$lastDraw['low_count']) ?> &nbsp;|&nbsp;
-        Profil: <code><?= h((string)$lastDraw['profile_hash']) ?></code>
+        Profil: <code><?= h((string)$lastDraw['profile_hash']) ?></code><span style="font-size:0.8em;color:#555;"> (strukturalny wzorzec)</span>
     </small>
 </div>
 <?php else: ?>
@@ -93,6 +93,7 @@ $totalDraws = (int)$pdo->query("SELECT COUNT(*) FROM `{$drawsTable}`")->fetchCol
 <?php endif; ?>
 
 <h2>Gorące liczby (ostatnie 500 losowań)</h2>
+<p style="font-size:0.85em;color:#555;margin-top:-8px;">Liczby które padały najczęściej w ostatnich 500 losowaniach. Kliknij <a href="?page=stats&game=<?= h($game) ?>">Statystyki</a> aby zobaczyć pełną tabelę z zaległościami.</p>
 <?php if (!empty($hotNumbers)): ?>
     <?php foreach ($hotNumbers as $row): ?>
         <span class="ball hot" title="Freq: <?= h((string)$row['freq']) ?>">
@@ -105,6 +106,7 @@ $totalDraws = (int)$pdo->query("SELECT COUNT(*) FROM `{$drawsTable}`")->fetchCol
 <?php endif; ?>
 
 <h2>Zimne liczby (ostatnie 500 losowań)</h2>
+<p style="font-size:0.85em;color:#555;margin-top:-8px;">Liczby które padały najrzadziej w ostatnich 500 losowaniach.</p>
 <?php if (!empty($coldNumbers)): ?>
     <?php foreach ($coldNumbers as $row): ?>
         <span class="ball cold" title="Freq: <?= h((string)$row['freq']) ?>">

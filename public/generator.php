@@ -67,6 +67,7 @@ if ($formPosted) {
     $consecMax   = isset($_POST['consec_max'])    ? (int)$_POST['consec_max']    : $pickCount;
     $hotMin      = isset($_POST['hot_min'])       ? (int)$_POST['hot_min']       : 0;
     $lastDigMax  = isset($_POST['last_digit_max'])? (int)$_POST['last_digit_max']: $pickCount;
+    $decadesMax  = isset($_POST['decades_max'])   ? max(1, min($pickCount, (int)$_POST['decades_max'])) : $pickCount;
     $wantedHashes= isset($_POST['profile_hashes']) && is_array($_POST['profile_hashes'])
                      ? $_POST['profile_hashes'] : [];
     $count       = max(1, min(20, (int)($_POST['count'] ?? 5)));
@@ -133,6 +134,18 @@ if ($formPosted) {
             continue;
         }
 
+        // Decades max filter: no single decade may have more than $decadesMax numbers
+        if ($decadesMax < $pickCount) {
+            $decadeGroups = [];
+            foreach ($selected as $n) {
+                $d = intdiv($n - 1, 10);
+                $decadeGroups[$d] = ($decadeGroups[$d] ?? 0) + 1;
+            }
+            if (max($decadeGroups) > $decadesMax) {
+                continue;
+            }
+        }
+
         // Profile hash filter
         if (!empty($wantedHashes) && !in_array($hash, $wantedHashes, true)) {
             continue;
@@ -164,6 +177,7 @@ $def = [
     'consec_max'     => (int)($_POST['consec_max']     ?? $pickCount - 1),
     'hot_min'        => (int)($_POST['hot_min']        ?? 0),
     'last_digit_max' => (int)($_POST['last_digit_max'] ?? $pickCount),
+    'decades_max'    => (int)($_POST['decades_max']    ?? $pickCount),
     'count'          => (int)($_POST['count']          ?? 5),
 ];
 $postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hashes'])
@@ -171,19 +185,21 @@ $postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hash
 ?>
 <h1><?= h($gameName) ?> &mdash; Generator kuponów</h1>
 
+<p style="color:#555;margin-bottom:15px;">Generator tworzy kupony spełniające wybrane kryteria statystyczne. Wagi losowania są oparte na historycznej częstości z ostatnich 500 losowań — liczby gorące są bardziej prawdopodobne do wylosowania. Nie zwiększa to szans na wygraną matematycznie, ale pozwala tworzyć kupony „zgodne z historycznym wzorcem".</p>
+
 <form method="post" action="">
     <input type="hidden" name="page" value="generator">
     <input type="hidden" name="game" value="<?= h($game) ?>">
 
     <table style="width:auto; background:none; border:none;">
         <tr>
-            <td><label>Suma min:</label></td>
+            <td><label title="Suma wszystkich 6 liczb w kuponie. Historycznie ~68% losowań Lotto ma sumę 110–170.">Suma min:</label></td>
             <td><input type="number" name="sum_min" value="<?= h((string)$def['sum_min']) ?>" min="0" max="999" style="width:80px;"></td>
-            <td><label>Suma max:</label></td>
+            <td><label title="Suma wszystkich 6 liczb w kuponie. Historycznie ~68% losowań Lotto ma sumę 110–170.">Suma max:</label></td>
             <td><input type="number" name="sum_max" value="<?= h((string)$def['sum_max']) ?>" min="0" max="999" style="width:80px;"></td>
         </tr>
         <tr>
-            <td><label>Parzyste min:</label></td>
+            <td><label title="Ile liczb parzystych (2,4,6...) w kuponie. Rozkład historyczny: najczęściej 3 parzyste.">Parzyste min:</label></td>
             <td>
                 <select name="even_min">
                     <?php for ($i = 0; $i <= $pickCount; $i++): ?>
@@ -191,7 +207,7 @@ $postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hash
                     <?php endfor; ?>
                 </select>
             </td>
-            <td><label>Parzyste max:</label></td>
+            <td><label title="Ile liczb parzystych (2,4,6...) w kuponie. Rozkład historyczny: najczęściej 3 parzyste.">Parzyste max:</label></td>
             <td>
                 <select name="even_max">
                     <?php for ($i = 0; $i <= $pickCount; $i++): ?>
@@ -201,7 +217,7 @@ $postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hash
             </td>
         </tr>
         <tr>
-            <td><label>Niskie min:</label></td>
+            <td><label title="Ile liczb z dolnej połowy puli (dla Lotto: 1–24). Rozkład historyczny: najczęściej 3 niskie.">Niskie min:</label></td>
             <td>
                 <select name="low_min">
                     <?php for ($i = 0; $i <= $pickCount; $i++): ?>
@@ -209,7 +225,7 @@ $postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hash
                     <?php endfor; ?>
                 </select>
             </td>
-            <td><label>Niskie max:</label></td>
+            <td><label title="Ile liczb z dolnej połowy puli (dla Lotto: 1–24). Rozkład historyczny: najczęściej 3 niskie.">Niskie max:</label></td>
             <td>
                 <select name="low_max">
                     <?php for ($i = 0; $i <= $pickCount; $i++): ?>
@@ -219,7 +235,7 @@ $postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hash
             </td>
         </tr>
         <tr>
-            <td><label>Maks. kolejnych par:</label></td>
+            <td><label title="Maksymalna liczba par kolejnych liczb (np. 7,8 lub 23,24). 0 = brak par kolejnych.">Maks. kolejnych par:</label></td>
             <td>
                 <select name="consec_max">
                     <?php for ($i = 0; $i < $pickCount; $i++): ?>
@@ -227,7 +243,7 @@ $postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hash
                     <?php endfor; ?>
                 </select>
             </td>
-            <td><label>Min. gorących (top-10):</label></td>
+            <td><label title="Minimalna liczba gorących liczb (top-10 z ostatnich 500 losowań) w kuponie.">Min. gorących (top-10):</label></td>
             <td>
                 <select name="hot_min">
                     <?php for ($i = 0; $i <= $pickCount; $i++): ?>
@@ -237,7 +253,7 @@ $postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hash
             </td>
         </tr>
         <tr>
-            <td><label>Maks. tych samych ostatnich cyfr:</label></td>
+            <td><label title="Ile liczb może kończyć się tą samą cyfrą (np. 3,13,23,33 – wszystkie kończą się 3). Brak ograniczenia: pick_count.">Maks. tych samych ostatnich cyfr:</label></td>
             <td>
                 <select name="last_digit_max">
                     <?php for ($i = 1; $i <= $pickCount; $i++): ?>
@@ -254,6 +270,11 @@ $postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hash
                 </select>
             </td>
         </tr>
+        <tr>
+            <td><label title="Maksymalna liczba liczb z jednej dziesiątki (np. max 2 z zakresu 10–19). Zmniejsza skupienie liczb w jednym przedziale.">Maks. z jednej dziesiątki:</label></td>
+            <td><input type="number" name="decades_max" value="<?= h((string)$def['decades_max']) ?>" min="1" max="<?= $pickCount ?>" style="width:60px;"></td>
+            <td colspan="2"><small style="color:#555;">Ogranicza skupienie liczb w jednym przedziale (1–9, 10–19, 20–29 itd.)</small></td>
+        </tr>
     </table>
 
     <?php if (!empty($profileHashes)): ?>
@@ -268,6 +289,7 @@ $postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hash
                 </option>
             <?php endforeach; ?>
         </select>
+        <small style="display:block;color:#555;margin-top:4px;">Profil to strukturalny wzorzec losowania. Wybierz jeden lub więcej profili aby generować tylko kupony o danym charakterze.<br>Format: {parzyste}e{nieparzyste}o_{niskie}l{wysokie}h_s{zakres sumy}_c{kolejne}_r{rozstęp}</small>
     </div>
     <?php endif; ?>
 
