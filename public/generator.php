@@ -253,7 +253,7 @@ $postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hash
             </td>
         </tr>
         <tr>
-            <td><label title="Ile liczb może kończyć się tą samą cyfrą (np. 3,13,23,33 – wszystkie kończą się 3). Brak ograniczenia: pick_count.">Maks. tych samych ostatnich cyfr:</label></td>
+            <td><label title="Ile liczb może kończyć się tą samą cyfrą (np. 3,13,23,33 – wszystkie kończą się 3). Brak ograniczenia: <?= $pickCount ?>.">Maks. tych samych ostatnich cyfr:</label></td>
             <td>
                 <select name="last_digit_max">
                     <?php for ($i = 1; $i <= $pickCount; $i++): ?>
