@@ -180,3 +180,13 @@ const NAV_LABELS = [
     'sync'      => 'Synchronizuj',
     'import'    => 'Wczytaj historię',
 ];
+
+const NAV_ICONS = [
+    'dashboard' => 'dashboard',
+    'draws'     => 'event_note',
+    'stats'     => 'analytics',
+    'generator' => 'casino',
+    'validator' => 'task_alt',
+    'sync'      => 'sync',
+    'import'    => 'download',
+];

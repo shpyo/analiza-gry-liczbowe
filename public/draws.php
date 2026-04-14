@@ -16,8 +16,6 @@ $pickCount  = (int)$gameConfig['pick_count'];
 // -----------------------------------------------------------------------
 $dateFrom = isset($_GET['date_from']) ? trim($_GET['date_from']) : '';
 $dateTo   = isset($_GET['date_to'])   ? trim($_GET['date_to'])   : '';
-
-// Validate dates
 if ($dateFrom !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) {
     $dateFrom = '';
 }
@@ -36,7 +34,6 @@ $currentPage = max(1, (int)($_GET['p'] ?? 1));
 // -----------------------------------------------------------------------
 $where  = [];
 $params = [];
-
 if ($dateFrom !== '') {
     $where[]  = 'draw_date >= ?';
     $params[] = $dateFrom;
@@ -45,7 +42,6 @@ if ($dateTo !== '') {
     $where[]  = 'draw_date <= ?';
     $params[] = $dateTo;
 }
-
 $whereSql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
 
 $countStmt = $pdo->prepare("SELECT COUNT(*) FROM `{$drawsTable}` {$whereSql}");
@@ -83,71 +79,97 @@ function draws_url(array $overrides = []): string
     return '?' . http_build_query(array_filter($params, fn($v) => $v !== ''));
 }
 ?>
-<h1><?= h($gameName) ?> &mdash; Losowania</h1>
 
-<form method="get" action="">
+<!-- Page Header -->
+<header class="page-header">
+    <div class="page-header__row">
+        <div>
+            <span class="text-label-md text-primary mb-2" style="display:block;">HISTORIA LOSOWAŃ</span>
+            <h1 class="page-header__title"><?= h($gameName) ?> &mdash; Losowania</h1>
+            <p class="page-header__desc">Pełna historia losowań z metrykami statystycznymi i profilami strukturalnymi.</p>
+        </div>
+    </div>
+</header>
+
+<!-- Date Filter -->
+<form method="get" action="" class="filter-card">
     <input type="hidden" name="page" value="draws">
     <input type="hidden" name="game" value="<?= h($game) ?>">
-    <label>Od: <input type="date" name="date_from" value="<?= h($dateFrom) ?>"></label>
-    <label>Do: <input type="date" name="date_to"   value="<?= h($dateTo) ?>"></label>
-    <input type="submit" value="Filtruj">
-    <?php if ($dateFrom !== '' || $dateTo !== ''): ?>
-        <a href="?page=draws&game=<?= h($game) ?>">Wyczyść</a>
-    <?php endif; ?>
+    <div class="form-row">
+        <div class="form-group">
+            <label class="form-label">Od</label>
+            <input type="date" name="date_from" value="<?= h($dateFrom) ?>" class="form-input" style="width:auto;">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Do</label>
+            <input type="date" name="date_to" value="<?= h($dateTo) ?>" class="form-input" style="width:auto;">
+        </div>
+        <button type="submit" class="btn btn--primary btn--sm">
+            <?= render_material_icon('filter_list') ?> Filtruj
+        </button>
+        <?php if ($dateFrom !== '' || $dateTo !== ''): ?>
+            <a href="?page=draws&game=<?= h($game) ?>" class="btn btn--ghost btn--sm">Wyczyść</a>
+        <?php endif; ?>
+    </div>
+    <p class="form-hint" style="margin-top:0.5rem;">
+        Znaleziono: <strong><?= h((string)$totalRows) ?></strong> losowań &mdash;
+        Strona <?= h((string)$currentPage) ?> / <?= h((string)$totalPages) ?>
+    </p>
 </form>
 
-<p>Znaleziono: <strong><?= h((string)$totalRows) ?></strong> losowań &mdash;
-   Strona <?= h((string)$currentPage) ?> / <?= h((string)$totalPages) ?></p>
-
 <?php if (empty($rows)): ?>
-<div class="alert alert-error">Brak losowań spełniających kryteria.</div>
+    <div class="alert alert-error">Brak losowań spełniających kryteria.</div>
 <?php else: ?>
 
-<table>
-    <thead>
-        <tr>
-            <th>#</th>
-            <th>Data</th>
-            <th>Liczby</th>
-            <?php if ($game === 'lotto_plus'): ?>
-            <th>Plus</th>
-            <?php endif; ?>
-            <th>Suma</th>
-            <th><?= render_tooltip('even_count', $game) ?></th>
-            <th><?= render_tooltip('low_count', $game) ?></th>
-            <th><?= render_tooltip('range_spread', $game) ?></th>
-            <th><?= render_tooltip('profile_hash', $game) ?></th>
-        </tr>
-    </thead>
-    <tbody>
-    <?php foreach ($rows as $row): ?>
-        <tr>
-            <td><?= h((string)$row['draw_number']) ?></td>
-            <td><?= h($row['draw_date']) ?></td>
-            <td>
-                <?php for ($i = 1; $i <= $pickCount; $i++): ?>
-                    <span class="ball"><?= h((string)$row["n{$i}"]) ?></span>
-                <?php endfor; ?>
-            </td>
-            <?php if ($game === 'lotto_plus'): ?>
-            <td>
-                <?php if ($row['plus_ball'] !== null): ?>
-                    <span class="ball plus"><?= h((string)$row['plus_ball']) ?></span>
+<div class="card">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Data</th>
+                <th>Liczby</th>
+                <?php if ($game === 'lotto_plus'): ?>
+                <th>Plus</th>
                 <?php endif; ?>
-            </td>
-            <?php endif; ?>
-            <td><?= h((string)$row['sum_total']) ?></td>
-            <td><?= h((string)$row['even_count']) ?></td>
-            <td><?= h((string)$row['low_count']) ?></td>
-            <td><?= h((string)$row['range_spread']) ?></td>
-            <td><small><?= h(describe_profile_short((string)$row['profile_hash'])) ?></small></td>
-        </tr>
-    <?php endforeach; ?>
-    </tbody>
-</table>
+                <th><?= render_tooltip('sum_total', $game) ?></th>
+                <th><?= render_tooltip('even_count', $game) ?></th>
+                <th><?= render_tooltip('low_count', $game) ?></th>
+                <th><?= render_tooltip('range_spread', $game) ?></th>
+                <th><?= render_tooltip('profile_hash', $game) ?></th>
+            </tr>
+        </thead>
+        <tbody>
+        <?php foreach ($rows as $row): ?>
+            <tr>
+                <td><strong><?= h((string)$row['draw_number']) ?></strong></td>
+                <td style="white-space:nowrap;"><?= h($row['draw_date']) ?></td>
+                <td>
+                    <div class="balls-row">
+                        <?php for ($i = 1; $i <= $pickCount; $i++): ?>
+                            <?= render_ball((int)$row["n{$i}"]) ?>
+                        <?php endfor; ?>
+                    </div>
+                </td>
+                <?php if ($game === 'lotto_plus'): ?>
+                <td>
+                    <?php if ($row['plus_ball'] !== null): ?>
+                        <?= render_ball((int)$row['plus_ball'], 'plus') ?>
+                    <?php endif; ?>
+                </td>
+                <?php endif; ?>
+                <td><?= h((string)$row['sum_total']) ?></td>
+                <td><?= h((string)$row['even_count']) ?></td>
+                <td><?= h((string)$row['low_count']) ?></td>
+                <td><?= h((string)$row['range_spread']) ?></td>
+                <td><span class="text-body-sm text-on-surface-variant"><?= h(describe_profile_short((string)$row['profile_hash'])) ?></span></td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+</div>
 
 <?php if ($totalPages > 1): ?>
-<div class="pagination" style="margin-top:15px;">
+<div class="pagination">
     <?php
     $range = range(max(1, $currentPage - 4), min($totalPages, $currentPage + 4));
     if ($currentPage > 1):
@@ -169,4 +191,5 @@ function draws_url(array $overrides = []): string
     <?php endif; ?>
 </div>
 <?php endif; ?>
+
 <?php endif; ?>

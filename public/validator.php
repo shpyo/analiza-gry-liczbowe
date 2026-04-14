@@ -24,7 +24,6 @@ $submitted  = false;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $submitted = true;
 
-    // Collect inputs n1..nX
     for ($i = 1; $i <= $pickCount; $i++) {
         $raw = isset($_POST["n{$i}"]) ? trim($_POST["n{$i}"]) : '';
         if ($raw === '' || !ctype_digit($raw)) {
@@ -40,7 +39,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (empty($errors)) {
-        // Check for duplicates
         if (count($inputNums) !== count(array_unique($inputNums))) {
             $errors[] = "Liczby nie mogą się powtarzać.";
         }
@@ -51,12 +49,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $metrics = compute_metrics($inputNums, $game);
         $hash    = compute_profile_hash($metrics, $game);
 
-        // Fetch profile info
         $profStmt = $pdo->prepare("SELECT * FROM `{$profileTable}` WHERE profile_hash = ?");
         $profStmt->execute([$hash]);
         $profileRow = $profStmt->fetch();
 
-        // Check exact combination
         $conditions = [];
         $params     = [];
         for ($i = 0; $i < $pickCount; $i++) {
@@ -73,33 +69,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// -----------------------------------------------------------------------
-// Total draws for percentage context
-// -----------------------------------------------------------------------
 $totalDraws = (int)$pdo->query("SELECT COUNT(*) FROM `{$drawsTable}`")->fetchColumn();
 ?>
-<h1><?= h($gameName) ?> &mdash; Weryfikator kombinacji</h1>
 
-<p style="color:#555;">Wpisz kombinację <?= $pickCount ?> liczb z zakresu 1–<?= $poolSize ?>. System obliczy profil statystyczny, sprawdzi jak często taki wzorzec padał historycznie i czy ta dokładna kombinacja kiedykolwiek wypadła.</p>
+<!-- Page Header -->
+<header class="page-header">
+    <div class="page-header__row">
+        <div>
+            <span class="text-label-md text-primary mb-2" style="display:block;">WERYFIKACJA</span>
+            <h1 class="page-header__title"><?= h($gameName) ?> &mdash; Weryfikator</h1>
+            <p class="page-header__desc">Wpisz kombinację <?= $pickCount ?> liczb z zakresu 1&ndash;<?= $poolSize ?>. System obliczy profil statystyczny, sprawdzi historię wzorca i unikatowość kombinacji.</p>
+        </div>
+    </div>
+</header>
 
-<form method="post" action="">
-    <input type="hidden" name="page" value="validator">
-    <input type="hidden" name="game" value="<?= h($game) ?>">
-    <p><small style="color:#555;">Wpisz liczby w dowolnej kolejności — zostaną automatycznie posortowane.</small></p>
-    <p>
-        <?php for ($i = 1; $i <= $pickCount; $i++): ?>
-            <label>Liczba <?= $i ?>:
-                <input type="number"
-                       name="n<?= $i ?>"
-                       min="1" max="<?= h((string)$poolSize) ?>"
-                       value="<?= isset($inputNums[$i - 1]) ? h((string)$inputNums[$i - 1]) : '' ?>"
-                       style="width:60px;"
-                       required>
-            </label>
-        <?php endfor; ?>
-    </p>
-    <input type="submit" value="Analizuj">
-</form>
+<!-- Input Form -->
+<div class="card mb-6">
+    <form method="post" action="?page=validator&game=<?= h($game) ?>">
+        <p class="text-body-sm text-on-surface-variant mb-4">Wpisz liczby w dowolnej kolejności — zostaną automatycznie posortowane.</p>
+
+        <div class="flex gap-3 mb-6" style="flex-wrap:wrap;justify-content:center;">
+            <?php for ($i = 1; $i <= $pickCount; $i++): ?>
+                <div style="display:flex;flex-direction:column;align-items:center;gap:0.25rem;">
+                    <input type="number"
+                           name="n<?= $i ?>"
+                           min="1" max="<?= h((string)$poolSize) ?>"
+                           value="<?= isset($inputNums[$i - 1]) ? h((string)$inputNums[$i - 1]) : '' ?>"
+                           class="num-input-circle"
+                           placeholder="?"
+                           required>
+                    <span class="text-label-lg text-outline"><?= $i ?></span>
+                </div>
+            <?php endfor; ?>
+        </div>
+
+        <div style="text-align:center;">
+            <button type="submit" class="btn btn--primary btn--lg">
+                <?= render_material_icon('task_alt') ?> Analizuj kombinację
+            </button>
+        </div>
+    </form>
+</div>
 
 <?php if (!empty($errors)): ?>
     <?php foreach ($errors as $err): ?>
@@ -109,86 +119,142 @@ $totalDraws = (int)$pdo->query("SELECT COUNT(*) FROM `{$drawsTable}`")->fetchCol
 
 <?php if ($submitted && empty($errors) && $metrics !== null): ?>
 
-<h2>Wyniki analizy</h2>
+<!-- Results -->
+<div class="bento-grid">
 
-<div class="coupon">
-    <strong>Kombinacja:</strong>&nbsp;
-    <?php foreach ($inputNums as $n): ?>
-        <span class="ball"><?= h((string)$n) ?></span>
-    <?php endforeach; ?>
-</div>
+    <!-- Combination Display + Metrics -->
+    <section class="card col-md-8 col-lg-8">
+        <h2 class="text-headline-lg mb-6">Wyniki analizy</h2>
 
-<h3>Metryki</h3>
-<table style="width:auto;">
-    <tr><th>Metryka</th><th>Wartość</th></tr>
-    <tr><td><?= render_tooltip('sum_total', $game) ?></td>                       <td><?= h((string)$metrics['sum_total']) ?></td></tr>
-    <tr><td><?= render_tooltip('even_count', $game) ?></td>                     <td><?= h((string)$metrics['even_count']) ?></td></tr>
-    <tr><td><?= render_tooltip('odd_count', $game) ?></td>                      <td><?= h((string)($pickCount - $metrics['even_count'])) ?></td></tr>
-    <tr><td><?= render_tooltip('low_count', $game) ?> (≤ <?= (int)$gameConfig['low_threshold'] ?>)</td>
-                                         <td><?= h((string)$metrics['low_count']) ?></td></tr>
-    <tr><td><?= render_tooltip('high_count', $game) ?></td>                     <td><?= h((string)($pickCount - $metrics['low_count'])) ?></td></tr>
-    <tr><td><?= render_tooltip('consecutive', $game) ?></td>                    <td><?= h((string)$metrics['consecutive']) ?></td></tr>
-    <tr><td><?= render_tooltip('decades_used', $game) ?></td>                   <td><?= h((string)$metrics['decades_used']) ?></td></tr>
-    <tr><td><?= render_tooltip('range_spread', $game) ?></td>                   <td><?= h((string)$metrics['range_spread']) ?></td></tr>
-    <tr><td><?= render_tooltip('last_digit_unique', $game) ?></td>              <td><?= h((string)$metrics['last_digit_unique']) ?></td></tr>
-    <tr><th><?= render_tooltip('profile_hash', $game) ?></th>                   <td><?= h(describe_profile($hash, $game)) ?></td></tr>
-</table>
+        <!-- Ball display -->
+        <div class="balls-row balls-row--lg mb-8" style="justify-content:center;">
+            <?php foreach ($inputNums as $n): ?>
+                <?= render_ball($n, 'xl') ?>
+            <?php endforeach; ?>
+        </div>
 
-<h3>Profil w bazie</h3>
-<?php if ($profileRow): ?>
-    <div class="alert alert-success">
-        Ten profil wystąpił <strong><?= h((string)$profileRow['total_draws']) ?></strong> razy
-        (<?= h((string)$profileRow['pct_of_total']) ?>% wszystkich losowań).
-        Po raz ostatni: <strong><?= h($profileRow['last_seen']) ?></strong>.
-        Pierwszy raz: <?= h($profileRow['first_seen']) ?>.
-    </div>
-<?php elseif ($totalDraws > 0): ?>
-    <div class="alert alert-error">
-        Ten profil <strong>nigdy nie wystąpił</strong> w historii losowań.
-    </div>
-<?php else: ?>
-    <div class="alert">Brak danych w bazie (import niewykonany).</div>
-<?php endif; ?>
+        <!-- Metrics Table -->
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Metryka</th>
+                    <th>Wartość</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><?= render_tooltip('sum_total', $game) ?></td>
+                    <td><strong><?= h((string)$metrics['sum_total']) ?></strong></td>
+                </tr>
+                <tr>
+                    <td><?= render_tooltip('even_count', $game) ?> / <?= metric_label('odd_count') ?></td>
+                    <td><strong><?= h((string)$metrics['even_count']) ?></strong> / <?= h((string)($pickCount - $metrics['even_count'])) ?></td>
+                </tr>
+                <tr>
+                    <td><?= render_tooltip('low_count', $game) ?> (&le; <?= (int)$gameConfig['low_threshold'] ?>) / <?= metric_label('high_count') ?></td>
+                    <td><strong><?= h((string)$metrics['low_count']) ?></strong> / <?= h((string)($pickCount - $metrics['low_count'])) ?></td>
+                </tr>
+                <tr>
+                    <td><?= render_tooltip('consecutive', $game) ?></td>
+                    <td><strong><?= h((string)$metrics['consecutive']) ?></strong></td>
+                </tr>
+                <tr>
+                    <td><?= render_tooltip('decades_used', $game) ?></td>
+                    <td><strong><?= h((string)$metrics['decades_used']) ?></strong></td>
+                </tr>
+                <tr>
+                    <td><?= render_tooltip('range_spread', $game) ?></td>
+                    <td><strong><?= h((string)$metrics['range_spread']) ?></strong></td>
+                </tr>
+                <tr>
+                    <td><?= render_tooltip('last_digit_unique', $game) ?></td>
+                    <td><strong><?= h((string)$metrics['last_digit_unique']) ?></strong></td>
+                </tr>
+                <tr>
+                    <td><?= render_tooltip('profile_hash', $game) ?></td>
+                    <td><strong><?= h(describe_profile_short($hash)) ?></strong></td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
 
-<h3>Co to znaczy?</h3>
-<div style="background:#fff;border:1px solid #ddd;padding:12px 18px;border-radius:4px;margin-bottom:15px;">
-    <p style="margin:0 0 8px 0;">
-        <strong>Profil strukturalny:</strong> <?= h(describe_profile($hash, $game)) ?>
-    </p>
-    <?php if ($profileRow): ?>
-        <?php $pct = (float)$profileRow['pct_of_total']; ?>
-        <p style="margin:0 0 8px 0;">
-            <?php if ($pct > 2.0): ?>
-                <strong>Popularność wzorca: popularny</strong> — ten układ strukturalny padał w <?= h((string)$profileRow['pct_of_total']) ?>% wszystkich losowań. Jest to jeden z częstszych wzorców.
-            <?php elseif ($pct >= 0.5): ?>
-                <strong>Popularność wzorca: rzadki</strong> — ten układ strukturalny padał w <?= h((string)$profileRow['pct_of_total']) ?>% wszystkich losowań. Wzorzec niezbyt powszechny.
+    <!-- Profile & Match Info -->
+    <div class="col-md-4 col-lg-4" style="display:flex;flex-direction:column;gap:1.5rem;">
+
+        <!-- Profile Status -->
+        <section class="card card--tonal">
+            <h3 class="text-headline-md mb-3">Profil w bazie</h3>
+            <?php if ($profileRow): ?>
+                <div class="alert alert-success">
+                    Profil wystąpił <strong><?= h((string)$profileRow['total_draws']) ?></strong> razy
+                    (<?= h((string)$profileRow['pct_of_total']) ?>% losowań).
+                </div>
+                <div style="display:flex;flex-direction:column;gap:0.5rem;">
+                    <div class="stat-item">
+                        <span class="stat-item__label">Ostatnio</span>
+                        <span class="stat-item__value stat-item__value--sm"><?= h($profileRow['last_seen']) ?></span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-item__label">Pierwszy raz</span>
+                        <span class="stat-item__value stat-item__value--sm"><?= h($profileRow['first_seen']) ?></span>
+                    </div>
+                </div>
+            <?php elseif ($totalDraws > 0): ?>
+                <div class="alert alert-error">
+                    Ten profil <strong>nigdy nie wystąpił</strong> w historii losowań.
+                </div>
             <?php else: ?>
-                <strong>Popularność wzorca: bardzo rzadki</strong> — ten układ strukturalny padał zaledwie w <?= h((string)$profileRow['pct_of_total']) ?>% wszystkich losowań.
+                <div class="alert alert-warning">Brak danych w bazie (import niewykonany).</div>
             <?php endif; ?>
-        </p>
-    <?php elseif ($totalDraws > 0): ?>
-        <p style="margin:0 0 8px 0;"><strong>Popularność wzorca:</strong> ten wzorzec strukturalny nigdy nie padł w historii <?= h($gameName) ?>.</p>
-    <?php endif; ?>
-    <p style="margin:0;">
-        <?php if ($exactMatch): ?>
-            Ta kombinacja padła już raz — dnia <strong><?= h($exactMatch['draw_date']) ?></strong> (losowanie #<?= h((string)$exactMatch['draw_number']) ?>).
-        <?php else: ?>
-            Ta kombinacja nigdy nie padła w historii <?= h($gameName) ?>.
+        </section>
+
+        <!-- Exact Match -->
+        <section class="card">
+            <h3 class="text-headline-md mb-3">Dokładna kombinacja</h3>
+            <?php if ($exactMatch): ?>
+                <div class="alert alert-error">
+                    <?= render_material_icon('warning', 'icon-filled') ?>
+                    Kombinacja była losowana <?= h($exactMatch['draw_date']) ?>
+                    (#<?= h((string)$exactMatch['draw_number']) ?>).
+                </div>
+            <?php else: ?>
+                <div class="alert alert-success">
+                    <?= render_material_icon('check_circle', 'icon-filled') ?>
+                    Ta kombinacja <strong>nigdy nie była losowana</strong>.
+                </div>
+            <?php endif; ?>
+        </section>
+
+        <!-- Popularity -->
+        <?php if ($profileRow): ?>
+        <section class="card">
+            <h3 class="text-headline-md mb-3">Popularność wzorca</h3>
+            <?php $pct = (float)$profileRow['pct_of_total']; ?>
+            <?php if ($pct > 2.0): ?>
+                <?= render_badge('Popularny', 'stable') ?>
+                <p class="text-body-sm text-on-surface-variant" style="margin-top:0.5rem;">Ten układ padał w <?= h((string)$profileRow['pct_of_total']) ?>% losowań — jeden z częstszych wzorców.</p>
+            <?php elseif ($pct >= 0.5): ?>
+                <?= render_badge('Rzadki', 'rare') ?>
+                <p class="text-body-sm text-on-surface-variant" style="margin-top:0.5rem;">Ten układ padał w <?= h((string)$profileRow['pct_of_total']) ?>% losowań — niezbyt powszechny.</p>
+            <?php else: ?>
+                <?= render_badge('Bardzo rzadki', 'cold') ?>
+                <p class="text-body-sm text-on-surface-variant" style="margin-top:0.5rem;">Ten układ padał zaledwie w <?= h((string)$profileRow['pct_of_total']) ?>% losowań.</p>
+            <?php endif; ?>
+            <div class="progress-bar" style="margin-top:0.75rem;">
+                <div class="progress-bar__fill" style="width:<?= min(100, $pct * 10) ?>%;"></div>
+            </div>
+        </section>
         <?php endif; ?>
-    </p>
+    </div>
+
 </div>
 
-<h3>Dokładna kombinacja</h3>
-<?php if ($exactMatch): ?>
-    <div class="alert alert-error">
-        ⚠️ Ta kombinacja była już losowana
-        w dniu <strong><?= h($exactMatch['draw_date']) ?></strong>
-        (losowanie #<?= h((string)$exactMatch['draw_number']) ?>).
-    </div>
-<?php else: ?>
-    <div class="alert alert-success">
-        ✅ Ta dokładna kombinacja <strong>nigdy nie była losowana</strong>.
-    </div>
-<?php endif; ?>
+<!-- Profile Description -->
+<div class="card" style="margin-top:1.5rem;">
+    <h3 class="text-headline-md mb-3">Opis profilu strukturalnego</h3>
+    <p class="text-body-lg" style="line-height:1.8;">
+        <?= h(describe_profile($hash, $game)) ?>
+    </p>
+</div>
 
 <?php endif; ?>

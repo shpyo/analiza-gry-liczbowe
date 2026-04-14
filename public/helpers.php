@@ -324,11 +324,11 @@ function h(string $val): string
 function heatmap_bucket_color(int $bucket): array
 {
     $palette = [
-        0 => ['bg' => '#bbf7d0', 'text' => '#14532d'], // Q1 pale green
-        1 => ['bg' => '#4ade80', 'text' => '#14532d'], // Q2 green
-        2 => ['bg' => '#fde047', 'text' => '#713f12'], // Q3 yellow
-        3 => ['bg' => '#fb923c', 'text' => '#431407'], // Q4 orange
-        4 => ['bg' => '#b91c1c', 'text' => '#fff'],    // Q5 deep red
+        0 => ['bg' => '#e7e8e9', 'text' => '#414754'], // Q1 surface-container-high (cold)
+        1 => ['bg' => '#90bafe', 'text' => '#001a41'], // Q2 secondary-container
+        2 => ['bg' => '#d8e2ff', 'text' => '#004493'], // Q3 primary-fixed
+        3 => ['bg' => '#ffb870', 'text' => '#2c1600'], // Q4 tertiary-fixed-dim (warm)
+        4 => ['bg' => '#8b5000', 'text' => '#ffffff'], // Q5 tertiary (hot)
     ];
     return $palette[max(0, min(4, $bucket))];
 }
@@ -345,9 +345,30 @@ function render_tooltip(string $metric, string $game = 'lotto'): string
 {
     $label   = metric_label($metric);
     $tooltip = metric_tooltip($metric, $game);
-    return '<abbr title="' . htmlspecialchars($tooltip, ENT_QUOTES, 'UTF-8') . '">'
+    return '<span class="tooltip-trigger" title="' . htmlspecialchars($tooltip, ENT_QUOTES, 'UTF-8') . '">'
          . htmlspecialchars($label, ENT_QUOTES, 'UTF-8')
-         . ' <span style="font-size:0.75em;opacity:0.7;">?</span></abbr>';
+         . ' <span class="tooltip-icon">?</span></span>';
+}
+
+// ---------------------------------------------------------------------------
+// Render helpers for the new design system
+// ---------------------------------------------------------------------------
+
+function render_ball(int $number, string $modifier = ''): string
+{
+    $class = 'ball' . ($modifier ? ' ball--' . $modifier : '');
+    return '<span class="' . $class . '">' . $number . '</span>';
+}
+
+function render_badge(string $label, string $type = 'info'): string
+{
+    return '<span class="badge badge--' . h($type) . '">' . h($label) . '</span>';
+}
+
+function render_material_icon(string $name, string $extraClass = ''): string
+{
+    $cls = 'material-symbols-outlined' . ($extraClass ? ' ' . $extraClass : '');
+    return '<span class="' . $cls . '">' . h($name) . '</span>';
 }
 
 // ---------------------------------------------------------------------------

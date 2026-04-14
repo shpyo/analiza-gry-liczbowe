@@ -10,8 +10,7 @@ declare(strict_types=1);
 $isCli = PHP_SAPI === 'cli';
 
 if (!$isCli) {
-    // Ensure HTML wrapper not already started by index.php
-    // This file is included inside index.php, so no need for headers here
+    // Included inside index.php, no headers needed
 }
 
 require_once __DIR__ . '/db.php';
@@ -38,7 +37,9 @@ if ($targetGame !== null && !in_array($targetGame, GAMES, true)) {
 $gamesToProcess = $targetGame !== null ? [$targetGame] : GAMES;
 
 if (!$isCli) {
-    echo '<h1>Import Draws</h1>';
+    echo '<header class="page-header"><div><span class="text-label-md text-primary mb-2" style="display:block;">ADMINISTRACJA</span>';
+    echo '<h1 class="page-header__title">Import losowań</h1>';
+    echo '<p class="page-header__desc">Jednorazowy import pełnej historii losowań z mbnet.com.pl.</p></div></header>';
 }
 
 foreach ($gamesToProcess as $slug) {
@@ -49,8 +50,9 @@ foreach ($gamesToProcess as $slug) {
     if ($isCli) {
         echo "=== Importing {$gameName} from {$url} ===\n";
     } else {
-        echo '<h2>' . h($gameName) . '</h2>';
-        echo '<p>Fetching from <code>' . h($url) . '</code>...</p>';
+        echo '<div class="card mb-4">';
+        echo '<h2 class="text-headline-md mb-3">' . h($gameName) . '</h2>';
+        echo '<p class="text-body-sm text-on-surface-variant mb-4">Pobieranie z <code>' . h($url) . '</code>...</p>';
     }
 
     $context = stream_context_create([
@@ -67,7 +69,7 @@ foreach ($gamesToProcess as $slug) {
         if ($isCli) {
             echo "ERROR: {$errMsg}\n";
         } else {
-            echo '<div class="alert alert-error">' . h($errMsg) . '</div>';
+            echo '<div class="alert alert-error">' . h($errMsg) . '</div></div>';
         }
         continue;
     }
@@ -94,14 +96,14 @@ foreach ($gamesToProcess as $slug) {
         }
     }
 
-    // Rebuild profiles after import
     rebuild_profiles($pdo, $slug);
 
-    $summary = "Inserted: {$inserted}, Already existed: {$skipped}, Parse errors: {$errors}";
+    $summary = "Wstawiono: {$inserted}, Już istniało: {$skipped}, Błędy parsowania: {$errors}";
     if ($isCli) {
         echo $summary . "\n";
         echo "Profiles rebuilt.\n\n";
     } else {
-        echo '<div class="alert alert-success">' . h($summary) . ' &mdash; Profiles rebuilt.</div>';
+        echo '<div class="alert alert-success">' . h($summary) . ' &mdash; Profile przebudowane.</div>';
+        echo '</div>';
     }
 }

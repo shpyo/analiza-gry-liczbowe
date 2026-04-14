@@ -24,86 +24,138 @@ $gameNames = [
     'lotto_plus' => 'Lotto Plus',
     'mini_lotto' => 'Mini Lotto',
 ];
-
-function nav_link(string $label, string $page, string $game, string $currentPage, string $currentGame): string
-{
-    $active = ($page === $currentPage && $game === $currentGame);
-    $url = '?page=' . urlencode($page) . '&game=' . urlencode($game);
-    $class = $active ? ' style="color:#ffd700;"' : '';
-    return '<a href="' . h($url) . '"' . $class . '>' . h($label) . '</a>';
-}
 ?>
 <!DOCTYPE html>
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Analiza Gier Liczbowych &mdash; <?= h($gameNames[$game]) ?></title>
-<style>
-body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f5; }
-.container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-nav { background: #1a3a6b; padding: 10px 20px; }
-nav a { color: #fff; text-decoration: none; margin-right: 15px; font-weight: bold; }
-nav a:hover { color: #ffd700; }
-nav .game-selector { margin-left: 30px; }
-h1, h2 { color: #1a3a6b; }
-table { border-collapse: collapse; width: 100%; background: #fff; }
-th { background: #1a3a6b; color: #fff; padding: 8px 12px; text-align: left; }
-td { padding: 6px 12px; border-bottom: 1px solid #ddd; }
-tr:hover { background: #f0f4ff; }
-.hot { color: #c0392b; font-weight: bold; }
-.cold { color: #2980b9; font-weight: bold; }
-form { background: #fff; padding: 15px; margin-bottom: 20px; border: 1px solid #ddd; }
-label { display: inline-block; min-width: 200px; }
-input[type=number], input[type=text], select { padding: 4px 8px; margin: 3px 0; }
-button, input[type=submit] { background: #1a3a6b; color: #fff; border: none; padding: 8px 18px; cursor: pointer; border-radius: 3px; }
-button:hover, input[type=submit]:hover { background: #2a5a9b; }
-.pagination a { display: inline-block; padding: 5px 10px; margin: 2px; background: #fff; border: 1px solid #ccc; text-decoration: none; color: #1a3a6b; }
-.pagination a.active { background: #1a3a6b; color: #fff; }
-.ball { display: inline-block; width: 28px; height: 28px; border-radius: 50%; background: #1a3a6b; color: #fff; text-align: center; line-height: 28px; font-size: 12px; font-weight: bold; margin: 1px; }
-.ball.plus { background: #c0392b; }
-.alert { padding: 10px 15px; border-radius: 3px; margin-bottom: 15px; }
-.alert-success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
-.alert-error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
-.coupon { background: #fff; border: 2px solid #1a3a6b; padding: 10px; margin: 5px 0; border-radius: 5px; }
-</style>
+<title>LottoAnalytics &mdash; <?= h($gameNames[$game]) ?></title>
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- Icons -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<!-- Stylesheet -->
+<link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-<nav>
-    <span>
-        <?= nav_link('Dashboard', 'dashboard', $game, $page, $game) ?>
-        <?= nav_link('Losowania', 'draws', $game, $page, $game) ?>
-        <?= nav_link('Statystyki', 'stats', $game, $page, $game) ?>
-        <?= nav_link('Generator', 'generator', $game, $page, $game) ?>
-        <?= nav_link('Weryfikator', 'validator', $game, $page, $game) ?>
-        <?= nav_link(NAV_LABELS['sync'], 'sync', $game, $page, $game) ?>
-        <?= nav_link(NAV_LABELS['import'], 'import', $game, $page, $game) ?>
-    </span>
-    <span class="game-selector">
+
+<!-- Top Navbar -->
+<nav class="top-navbar">
+    <div class="flex items-center gap-4">
+        <button class="menu-toggle" onclick="document.body.classList.toggle('sidebar-open')" aria-label="Menu">
+            <span class="material-symbols-outlined">menu</span>
+        </button>
+        <a href="?page=dashboard&game=<?= h($game) ?>" class="top-navbar__logo" style="text-decoration:none;color:inherit;">LottoAnalytics</a>
+    </div>
+
+    <div class="top-navbar__games">
         <?php foreach ($gameNames as $slug => $name): ?>
-            <?php $active = ($slug === $game); ?>
             <a href="<?= h('?page=' . urlencode($page) . '&game=' . urlencode($slug)) ?>"
-               <?= $active ? 'style="color:#ffd700;"' : '' ?>>
+               class="<?= $slug === $game ? 'active' : '' ?>">
                 <?= h($name) ?>
             </a>
         <?php endforeach; ?>
-    </span>
+    </div>
+
+    <div class="top-navbar__actions">
+        <div class="top-navbar__search">
+            <span class="material-symbols-outlined search-icon" style="font-size:1.125rem;">search</span>
+            <input type="text" placeholder="Szukaj wyników..." disabled>
+        </div>
+    </div>
 </nav>
-<div class="container">
-<?php
-try {
-    $pageFile = __DIR__ . '/' . $page . '.php';
-    if (file_exists($pageFile)) {
-        include $pageFile;
-    } else {
-        echo '<div class="alert alert-error">Page not found: ' . h($page) . '</div>';
+
+<!-- Sidebar Backdrop (mobile) -->
+<div class="sidebar-backdrop" onclick="document.body.classList.remove('sidebar-open')" style="display:none;"></div>
+
+<div class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar__header">
+            <div class="sidebar__header-icon">
+                <span class="material-symbols-outlined">casino</span>
+            </div>
+            <div class="sidebar__header-text">
+                <h3>Analiza Gry</h3>
+                <p>Statystyki &amp; systemy</p>
+            </div>
+        </div>
+
+        <nav class="sidebar__nav">
+            <?php
+            $sidebarLinks = [
+                'dashboard' => ['icon' => 'dashboard',   'label' => NAV_LABELS['dashboard']],
+                'draws'     => ['icon' => 'event_note',  'label' => NAV_LABELS['draws']],
+                'stats'     => ['icon' => 'analytics',   'label' => NAV_LABELS['stats']],
+                'generator' => ['icon' => 'casino',      'label' => NAV_LABELS['generator']],
+                'validator' => ['icon' => 'task_alt',     'label' => NAV_LABELS['validator']],
+                'sync'      => ['icon' => 'sync',        'label' => NAV_LABELS['sync']],
+                'import'    => ['icon' => 'download',    'label' => NAV_LABELS['import']],
+            ];
+            foreach ($sidebarLinks as $pg => $meta):
+                $isActive = ($pg === $page);
+                $url = '?page=' . urlencode($pg) . '&game=' . urlencode($game);
+            ?>
+            <a href="<?= h($url) ?>" class="sidebar__link<?= $isActive ? ' active' : '' ?>">
+                <span class="material-symbols-outlined"><?= $meta['icon'] ?></span>
+                <span><?= h($meta['label']) ?></span>
+            </a>
+            <?php endforeach; ?>
+        </nav>
+
+        <div class="sidebar__footer">
+            <div class="sidebar__promo">
+                <p>PRO TIP</p>
+                <p>Wygenerowane liczby oparte są na trendach prawdopodobieństwa z ostatnich 10 lat.</p>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+    <?php
+    try {
+        $pageFile = __DIR__ . '/' . $page . '.php';
+        if (file_exists($pageFile)) {
+            include $pageFile;
+        } else {
+            echo '<div class="alert alert-error">Nie znaleziono strony: ' . h($page) . '</div>';
+        }
+    } catch (PDOException $e) {
+        echo '<div class="alert alert-error">Błąd bazy danych: ' . h($e->getMessage()) . '</div>';
+    } catch (Exception $e) {
+        echo '<div class="alert alert-error">Błąd: ' . h($e->getMessage()) . '</div>';
     }
-} catch (PDOException $e) {
-    echo '<div class="alert alert-error">Database error: ' . h($e->getMessage()) . '</div>';
-} catch (Exception $e) {
-    echo '<div class="alert alert-error">Error: ' . h($e->getMessage()) . '</div>';
-}
-?>
+    ?>
+    </main>
 </div>
+
+<!-- Footer -->
+<footer class="app-footer">
+    <div class="app-footer__inner">
+        <div>
+            <div class="app-footer__brand">LottoAnalytics</div>
+            <p class="app-footer__copy">&copy; <?= date('Y') ?> LottoAnalytics. Odpowiedzialna gra.</p>
+        </div>
+        <div class="app-footer__links">
+            <a href="#">Polityka prywatności</a>
+            <a href="#">Regulamin</a>
+            <a href="#" style="font-weight:700;color:var(--primary);">Odpowiedzialna gra</a>
+            <a href="#">Kontakt</a>
+        </div>
+    </div>
+</footer>
+
+<script>
+// Mobile sidebar backdrop visibility
+const backdrop = document.querySelector('.sidebar-backdrop');
+const observer = new MutationObserver(function() {
+    backdrop.style.display = document.body.classList.contains('sidebar-open') ? 'block' : 'none';
+});
+observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+</script>
 </body>
 </html>

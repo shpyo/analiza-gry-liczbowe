@@ -10,6 +10,7 @@ $gameConfig = get_game_config($pdo, $game);
 $gameName   = $gameConfig['name'];
 $drawsTable = GAME_TABLES[$game];
 $pickCount  = (int)$gameConfig['pick_count'];
+$poolSize   = (int)$gameConfig['pool_size'];
 
 // -----------------------------------------------------------------------
 // Last draw
@@ -26,7 +27,6 @@ for ($i = 1; $i <= $pickCount; $i++) {
     $numberCols[] = "n{$i}";
 }
 
-// Build a CTE-based UNION query; last 500 draws fetched once
 $colList   = implode(', ', array_map(fn($c) => "`{$c}`", $numberCols));
 $cteParts  = [];
 foreach ($numberCols as $col) {
@@ -44,16 +44,7 @@ $freqRows = $pdo->query(
 )->fetchAll();
 
 $hotNumbers  = array_slice($freqRows, 0, 5);
-$coldNumbers = array_slice(array_reverse($freqRows), 0, 5);
-
-// -----------------------------------------------------------------------
-// Last sync info
-// -----------------------------------------------------------------------
-$syncLog = $pdo->prepare(
-    "SELECT * FROM sync_log WHERE game_slug = ? ORDER BY synced_at DESC LIMIT 1"
-);
-$syncLog->execute([$game]);
-$lastSync = $syncLog->fetch();
+$coldNumbers = array_slice(array_reverse($freqRows), 0, 3);
 
 // -----------------------------------------------------------------------
 // Total draws count
@@ -61,83 +52,148 @@ $lastSync = $syncLog->fetch();
 $totalDraws = (int)$pdo->query("SELECT COUNT(*) FROM `{$drawsTable}`")->fetchColumn();
 
 // -----------------------------------------------------------------------
+// Compute distribution for last draw
+// -----------------------------------------------------------------------
+$evenPct = 0;
+$oddPct  = 0;
+$lowPct  = 0;
+$highPct = 0;
+if ($lastDraw) {
+    $evenPct = round((int)$lastDraw['even_count'] / $pickCount * 100);
+    $oddPct  = 100 - $evenPct;
+    $lowPct  = round((int)$lastDraw['low_count'] / $pickCount * 100);
+    $highPct = 100 - $lowPct;
+}
+
+// -----------------------------------------------------------------------
 // Render
 // -----------------------------------------------------------------------
 ?>
-<h1><?= h($gameName) ?> &mdash; Dashboard</h1>
 
-<p><strong>Łącznie losowań w bazie:</strong> <?= h((string)$totalDraws) ?></p>
+<!-- Page Header -->
+<header class="page-header">
+    <div class="page-header__row">
+        <div>
+            <span class="text-label-md text-primary mb-2" style="display:block;"><?= h(strtoupper($gameName)) ?> DASHBOARD</span>
+            <h1 class="page-header__title">Najnowsze wyniki losowania</h1>
+            <p class="page-header__desc">Kompleksowe zestawienie statystyczne najnowszego losowania <?= h($gameName) ?>. Analiza częstości, trendów i wzorców.</p>
+        </div>
+        <div>
+            <a href="?page=validator&game=<?= h($game) ?>" class="btn btn--secondary btn--lg">
+                <?= render_material_icon('confirmation_number', 'icon-filled') ?>
+                Weryfikuj kupon
+            </a>
+        </div>
+    </div>
+</header>
 
-<?php if ($lastDraw): ?>
-<h2>Ostatnie losowanie</h2>
-<div class="coupon">
-    <strong>Losowanie #<?= h((string)$lastDraw['draw_number']) ?></strong>
-    &mdash;
-    <?= h($lastDraw['draw_date']) ?>
-    &nbsp;&nbsp;
-    <?php for ($i = 1; $i <= $pickCount; $i++): ?>
-        <span class="ball"><?= h((string)$lastDraw["n{$i}"]) ?></span>
-    <?php endfor; ?>
-    <?php if ($game === 'lotto_plus' && $lastDraw['plus_ball'] !== null): ?>
-        <span class="ball plus"><?= h((string)$lastDraw['plus_ball']) ?></span>
-    <?php endif; ?>
-    <br><small>
-        Suma: <?= h((string)$lastDraw['sum_total']) ?> &nbsp;|&nbsp;
-        Parzyste: <?= h((string)$lastDraw['even_count']) ?> &nbsp;|&nbsp;
-        Niskie: <?= h((string)$lastDraw['low_count']) ?> &nbsp;|&nbsp;
-        Profil: <?= h(describe_profile((string)$lastDraw['profile_hash'], $game)) ?>
-    </small>
+<?php if (!$lastDraw): ?>
+    <div class="alert alert-error">Brak losowań w bazie. Użyj <a href="?page=import&game=<?= h($game) ?>">Import</a> aby pobrać dane.</div>
+<?php else: ?>
+
+<!-- Bento Grid -->
+<div class="bento-grid">
+
+    <!-- Latest Draw Card (col-span-8) -->
+    <section class="card col-md-8 col-lg-8">
+        <div class="flex justify-between items-center mb-6" style="flex-wrap:wrap;gap:0.5rem;">
+            <div>
+                <p class="text-label-lg text-outline mb-2">Losowanie #<?= h((string)$lastDraw['draw_number']) ?> &mdash; <?= h($lastDraw['draw_date']) ?></p>
+                <h2 class="text-headline-lg">Wylosowane liczby</h2>
+            </div>
+            <span class="badge badge--info">
+                <?= render_material_icon('verified') ?>
+                Oficjalne wyniki
+            </span>
+        </div>
+
+        <div class="balls-row balls-row--lg mb-8">
+            <?php for ($i = 1; $i <= $pickCount; $i++): ?>
+                <?= render_ball((int)$lastDraw["n{$i}"], 'xl') ?>
+            <?php endfor; ?>
+            <?php if ($game === 'lotto_plus' && $lastDraw['plus_ball'] !== null): ?>
+                <?= render_ball((int)$lastDraw['plus_ball'], 'xl ball--plus') ?>
+            <?php endif; ?>
+        </div>
+
+        <div class="section-divider" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1.5rem;">
+            <div class="stat-item">
+                <span class="stat-item__label">Suma liczb</span>
+                <span class="stat-item__value"><?= h((string)$lastDraw['sum_total']) ?></span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-item__label">Parzyste / Nieparzyste</span>
+                <span class="stat-item__value"><?= h((string)$lastDraw['even_count']) ?> / <?= h((string)($pickCount - (int)$lastDraw['even_count'])) ?></span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-item__label">Łącznie losowań</span>
+                <span class="stat-item__value stat-item__value--primary"><?= h((string)$totalDraws) ?></span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Hot Numbers Card (col-span-4) -->
+    <section class="card card--tonal col-md-4 col-lg-4" style="display:flex;flex-direction:column;">
+        <div class="flex items-center gap-3 mb-4">
+            <?= render_material_icon('local_fire_department', 'icon-filled') ?>
+            <h2 class="text-headline-md" style="color:var(--tertiary);">Gorące liczby</h2>
+        </div>
+        <p class="text-body-sm text-on-surface-variant mb-4 leading-relaxed">Najczęściej losowane w ostatnich 500 losowaniach.</p>
+
+        <div style="display:flex;flex-direction:column;gap:0.75rem;flex:1;">
+            <?php foreach ($hotNumbers as $row): ?>
+            <div class="hot-item">
+                <div class="hot-item__left">
+                    <span class="hot-item__ball"><?= str_pad((string)$row['num'], 2, '0', STR_PAD_LEFT) ?></span>
+                    <span class="hot-item__name">Numer <?= h((string)$row['num']) ?></span>
+                </div>
+                <span class="hot-item__count"><?= h((string)$row['freq']) ?> los.</span>
+            </div>
+            <?php endforeach; ?>
+        </div>
+
+        <a href="?page=stats&game=<?= h($game) ?>" class="btn btn--ghost btn--full" style="margin-top:1rem;">
+            Zobacz statystyki <?= render_material_icon('arrow_forward') ?>
+        </a>
+    </section>
+
+    <!-- Odd/Even Distribution (col-span-7) -->
+    <section class="card col-md-7 col-lg-7">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-headline-md">Rozkład parzystych / niskich</h2>
+            <span class="text-label-lg text-outline">Obecny trend</span>
+        </div>
+        <div style="display:flex;align-items:flex-end;gap:1.5rem;height:12rem;padding:0 0.5rem;">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:0.5rem;height:100%;justify-content:flex-end;">
+                <div style="width:100%;background:var(--primary-container);border-radius:var(--radius-xl) var(--radius-xl) 0 0;height:<?= $oddPct ?>%;min-height:2px;"></div>
+                <span class="text-label-lg text-outline">NIEP. <?= $oddPct ?>%</span>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:0.5rem;height:100%;justify-content:flex-end;">
+                <div style="width:100%;background:var(--secondary-container);border-radius:var(--radius-xl) var(--radius-xl) 0 0;height:<?= $evenPct ?>%;min-height:2px;"></div>
+                <span class="text-label-lg text-outline">PARZ. <?= $evenPct ?>%</span>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:0.5rem;height:100%;justify-content:flex-end;">
+                <div style="width:100%;background:var(--surface-container-high);border-radius:var(--radius-xl) var(--radius-xl) 0 0;height:<?= $lowPct ?>%;min-height:2px;"></div>
+                <span class="text-label-lg text-outline">NISKIE <?= $lowPct ?>%</span>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:0.5rem;height:100%;justify-content:flex-end;">
+                <div style="width:100%;background:var(--surface-container-high);border-radius:var(--radius-xl) var(--radius-xl) 0 0;height:<?= $highPct ?>%;min-height:2px;"></div>
+                <span class="text-label-lg text-outline">WYSOKIE <?= $highPct ?>%</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Generate CTA Card (col-span-5) -->
+    <section class="card card--cta col-md-5 col-lg-5">
+        <div class="card-deco-1"></div>
+        <div class="card-deco-2"></div>
+        <div class="relative z-10">
+            <h2 class="text-headline-lg mb-3" style="font-family:var(--font-headline);">Generuj moje liczby</h2>
+            <p style="color:rgba(255,255,255,0.8);font-size:0.875rem;margin-bottom:1.5rem;line-height:1.6;">Nasz algorytm dobierze liczby na podstawie historycznych trendów prawdopodobieństwa.</p>
+            <a href="?page=generator&game=<?= h($game) ?>" class="btn btn--white">Szybki generator</a>
+        </div>
+    </section>
+
 </div>
-<?php else: ?>
-<div class="alert alert-error">Brak losowań w bazie. Użyj Import aby pobrać dane.</div>
-<?php endif; ?>
 
-<h2>Gorące liczby (ostatnie 500 losowań)</h2>
-<p style="font-size:0.85em;color:#555;margin-top:-8px;">Liczby, które padały najczęściej w ostatnich 500 losowaniach. Im wyższa częstość, tym „gorętsza" liczba — choć historia nie gwarantuje przyszłych wyników. Kliknij <a href="?page=stats&game=<?= h($game) ?>">Statystyki</a> aby zobaczyć pełną tabelę z zaległościami.</p>
-<?php if (!empty($hotNumbers)): ?>
-    <?php foreach ($hotNumbers as $row): ?>
-        <span class="ball hot" title="Freq: <?= h((string)$row['freq']) ?>">
-            <?= h((string)$row['num']) ?>
-        </span>
-    <?php endforeach; ?>
-    <br><small>Liczba pojawień: <?= implode(', ', array_map(fn($r) => h((string)$r['num']) . '×' . h((string)$r['freq']), $hotNumbers)) ?></small>
-<?php else: ?>
-    <p>Brak danych.</p>
 <?php endif; ?>
-
-<h2>Zimne liczby (ostatnie 500 losowań)</h2>
-<p style="font-size:0.85em;color:#555;margin-top:-8px;">Liczby, które padały najrzadziej w ostatnich 500 losowaniach — czekają dłużej niż inne na swoje pojawienie się. Pełna analiza zaległości (przerwa ÷ średni interwał) dostępna w zakładce <a href="?page=stats&game=<?= h($game) ?>">Statystyki</a>.</p>
-<?php if (!empty($coldNumbers)): ?>
-    <?php foreach ($coldNumbers as $row): ?>
-        <span class="ball cold" title="Freq: <?= h((string)$row['freq']) ?>">
-            <?= h((string)$row['num']) ?>
-        </span>
-    <?php endforeach; ?>
-    <br><small>Liczba pojawień: <?= implode(', ', array_map(fn($r) => h((string)$r['num']) . '×' . h((string)$r['freq']), $coldNumbers)) ?></small>
-<?php else: ?>
-    <p>Brak danych.</p>
-<?php endif; ?>
-
-<h2>Ostatnia synchronizacja</h2>
-<?php if ($lastSync): ?>
-<table style="width:auto;">
-    <tr><th>Data</th><td><?= h($lastSync['synced_at']) ?></td></tr>
-    <tr><th>Dodane</th><td><?= h((string)$lastSync['draws_added']) ?></td></tr>
-    <tr><th>Status</th><td><?= h($lastSync['status']) ?></td></tr>
-    <tr><th>Ostatni numer</th><td><?= h((string)$lastSync['last_draw_number']) ?></td></tr>
-    <?php if ($lastSync['error_msg']): ?>
-    <tr><th>Błąd</th><td class="hot"><?= h($lastSync['error_msg']) ?></td></tr>
-    <?php endif; ?>
-</table>
-<?php else: ?>
-<p>Brak wpisów synchronizacji.</p>
-<?php endif; ?>
-
-<h2>Szybkie linki</h2>
-<p>
-    <a href="?page=draws&game=<?= h($game) ?>">📋 Lista losowań</a> &nbsp;|&nbsp;
-    <a href="?page=stats&game=<?= h($game) ?>">📊 Statystyki liczb</a> &nbsp;|&nbsp;
-    <a href="?page=generator&game=<?= h($game) ?>">🎲 Generator kuponów</a> &nbsp;|&nbsp;
-    <a href="?page=validator&game=<?= h($game) ?>">✅ Weryfikator</a> &nbsp;|&nbsp;
-    <a href="?page=import&game=<?= h($game) ?>">⬇ Import danych</a>
-</p>

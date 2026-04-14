@@ -30,16 +30,17 @@ if ($targetGame !== null && !in_array($targetGame, GAMES, true)) {
 
 $gamesToSync = $targetGame !== null ? [$targetGame] : GAMES;
 
-echo '<h1>Sync Draws</h1>';
+echo '<header class="page-header"><div><span class="text-label-md text-primary mb-2" style="display:block;">ADMINISTRACJA</span>';
+echo '<h1 class="page-header__title">Synchronizacja losowań</h1></div></header>';
 
 foreach ($gamesToSync as $slug) {
     $gameConfig = get_game_config($pdo, $slug);
     $url        = $gameConfig['sync_url'];
     $gameName   = $gameConfig['name'];
 
-    echo '<h2>' . h($gameName) . '</h2>';
+    echo '<div class="card mb-4">';
+    echo '<h2 class="text-headline-md mb-3">' . h($gameName) . '</h2>';
 
-    // Get the highest draw_number already in DB
     $drawsTable  = GAME_TABLES[$slug];
     $maxDrawNum  = (int)$pdo->query("SELECT COALESCE(MAX(draw_number),0) FROM `{$drawsTable}`")->fetchColumn();
 
@@ -73,7 +74,6 @@ foreach ($gamesToSync as $slug) {
             if ($parsed === null) {
                 continue;
             }
-            // Only process draws newer than what we already have
             if ($parsed['draw_number'] <= $maxDrawNum) {
                 continue;
             }
@@ -89,16 +89,17 @@ foreach ($gamesToSync as $slug) {
             $status = 'no_new';
         }
 
-        // Rebuild profiles only if new draws were added
         if ($inserted > 0) {
             rebuild_profiles($pdo, $slug);
         }
 
         $summary = $inserted > 0
-            ? "Added {$inserted} new draw(s). Last draw number: {$lastNum}."
-            : "No new draws found (already up to date at draw #{$maxDrawNum}).";
+            ? "Dodano {$inserted} nowych losowań. Ostatni numer: {$lastNum}."
+            : "Brak nowych losowań (aktualne przy losowaniu #{$maxDrawNum}).";
         echo '<div class="alert ' . ($inserted > 0 ? 'alert-success' : '') . '">' . h($summary) . '</div>';
     }
+
+    echo '</div>';
 
     // Log to sync_log
     try {
