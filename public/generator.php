@@ -3,45 +3,36 @@ declare(strict_types=1);
 
 /**
  * generator.php - Weighted random coupon generator with profile filters
- * Included by index.php; $pdo, $game are available.
+ * Included by index.php; $pdo, $game, $gameDef, $kit are available.
  */
 
-$gameConfig   = get_game_config($pdo, $game);
-$gameName     = $gameConfig['name'];
-$drawsTable   = GAME_TABLES[$game];
-$profileTable = PROFILE_TABLES[$game];
-$pickCount    = (int)$gameConfig['pick_count'];
-$poolSize     = (int)$gameConfig['pool_size'];
+$pickCount    = $gameDef->pickCount;
+$poolSize     = $gameDef->poolSize;
+$drawsTable   = $gameDef->drawsTable;
+$profileTable = $gameDef->profileTable;
 
 // -----------------------------------------------------------------------
-// Build number weights from last 500 draws
+// Build number weights from last N draws
 // -----------------------------------------------------------------------
-$numberCols  = [];
-for ($i = 1; $i <= $pickCount; $i++) {
-    $numberCols[] = "n{$i}";
-}
-
-$colList   = implode(', ', array_map(fn($c) => "`{$c}`", $numberCols));
-$cteParts  = [];
-foreach ($numberCols as $col) {
-    $cteParts[] = "SELECT `{$col}` AS num FROM last500";
-}
-$unionSQL = implode(' UNION ALL ', $cteParts);
+$windowLimit = AnalysisConfig::WINDOW_SIZE;
+$colList  = $gameDef->numberColumnsSql();
+$unionSQL = $gameDef->unpivotNumbersSql('last_window');
 
 $freqRows = $pdo->query(
-    "WITH last500 AS (SELECT {$colList} FROM `{$drawsTable}` ORDER BY draw_number DESC LIMIT 500)
+    "WITH last_window AS (SELECT {$colList} FROM `{$drawsTable}` ORDER BY draw_number DESC LIMIT {$windowLimit})
      SELECT num, COUNT(*) AS freq FROM ({$unionSQL}) AS t WHERE num IS NOT NULL GROUP BY num"
 )->fetchAll(PDO::FETCH_KEY_PAIR);
 
-// weight = freq + 1 (min 1 so undrawn numbers are still eligible)
+// weight = freq + floor (min weight so undrawn numbers still have a chance)
+$weightFloor = AnalysisConfig::GENERATOR_WEIGHT_FLOOR;
 $weights = [];
 for ($n = 1; $n <= $poolSize; $n++) {
-    $weights[$n] = (int)($freqRows[$n] ?? 0) + 1;
+    $weights[$n] = (int)($freqRows[$n] ?? 0) + $weightFloor;
 }
 
-// Top-10 hot numbers
+// Top-N hot numbers
 arsort($freqRows);
-$top10 = array_keys(array_slice($freqRows, 0, 10, true));
+$top10 = array_keys(array_slice($freqRows, 0, AnalysisConfig::GENERATOR_TOP_HOT_COUNT, true));
 
 // -----------------------------------------------------------------------
 // Profile hashes for select
@@ -70,12 +61,15 @@ if ($formPosted) {
     $decadesMax  = isset($_POST['decades_max'])   ? max(1, min($pickCount, (int)$_POST['decades_max'])) : $pickCount;
     $wantedHashes= isset($_POST['profile_hashes']) && is_array($_POST['profile_hashes'])
                      ? $_POST['profile_hashes'] : [];
-    $count       = max(1, min(20, (int)($_POST['count'] ?? 5)));
+    $count       = max(1, min(AnalysisConfig::GENERATOR_MAX_COUPONS, (int)($_POST['count'] ?? AnalysisConfig::GENERATOR_DEFAULT_COUNT)));
 
     $knownHashes  = array_column($profileHashes, 'profile_hash');
     $wantedHashes = array_values(array_intersect($wantedHashes, $knownHashes));
 
-    $maxAttempts = 50000;
+    $calc     = $kit->calculator();
+    $describer = $kit->describer();
+
+    $maxAttempts = AnalysisConfig::GENERATOR_MAX_ATTEMPTS;
     $attempts    = 0;
 
     while (count($results) < $count && $attempts < $maxAttempts) {
@@ -106,8 +100,8 @@ if ($formPosted) {
         }
 
         sort($selected);
-        $metrics = compute_metrics($selected, $game);
-        $hash    = compute_profile_hash($metrics, $game);
+        $metrics = $calc->computeMetrics($selected, $gameDef);
+        $hash    = $describer->computeHash($metrics, $gameDef);
 
         if ($metrics['sum_total'] < $sumMin || $metrics['sum_total'] > $sumMax) continue;
         if ($metrics['even_count'] < $evenMin || $metrics['even_count'] > $evenMax) continue;
@@ -168,7 +162,7 @@ $maxFreqHm = max(1, max(array_values($freqRows) ?: [1]));
     <div class="page-header__row">
         <div>
             <h1 class="page-header__title">Generator kuponów</h1>
-            <p class="page-header__desc">Zaawansowane algorytmy dobierające liczby na podstawie historycznych trendów prawdopodobieństwa z ostatnich 500 losowań <?= h($gameName) ?>.</p>
+            <p class="page-header__desc">Zaawansowane algorytmy dobierające liczby na podstawie historycznych trendów prawdopodobieństwa z ostatnich 500 losowań <?= h($gameDef->name) ?>.</p>
         </div>
     </div>
 </header>
@@ -187,7 +181,7 @@ $maxFreqHm = max(1, max(array_values($freqRows) ?: [1]));
                 <div class="form-group" style="min-width:100px;">
                     <label class="form-label">Zestawy</label>
                     <select name="count" class="form-select" style="width:auto;">
-                        <?php foreach ([1,2,3,5,10,15,20] as $c): ?>
+                        <?php foreach (AnalysisConfig::GENERATOR_COUNT_OPTIONS as $c): ?>
                             <option value="<?= $c ?>" <?= $def['count'] === $c ? 'selected' : '' ?>><?= $c ?> zest.</option>
                         <?php endforeach; ?>
                     </select>
@@ -220,15 +214,15 @@ $maxFreqHm = max(1, max(array_values($freqRows) ?: [1]));
                 <div class="details-content">
                     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-top:1rem;">
                         <div class="form-group">
-                            <label class="form-label"><?= render_tooltip('sum_total', $game) ?> min</label>
+                            <label class="form-label"><?= $kit->texts()->renderTooltip('sum_total', $gameDef) ?> min</label>
                             <input type="number" name="sum_min" value="<?= h((string)$def['sum_min']) ?>" min="0" max="999" class="form-input">
                         </div>
                         <div class="form-group">
-                            <label class="form-label"><?= render_tooltip('sum_total', $game) ?> max</label>
+                            <label class="form-label"><?= $kit->texts()->renderTooltip('sum_total', $gameDef) ?> max</label>
                             <input type="number" name="sum_max" value="<?= h((string)$def['sum_max']) ?>" min="0" max="999" class="form-input">
                         </div>
                         <div class="form-group">
-                            <label class="form-label"><?= render_tooltip('even_count', $game) ?> min</label>
+                            <label class="form-label"><?= $kit->texts()->renderTooltip('even_count', $gameDef) ?> min</label>
                             <select name="even_min" class="form-select">
                                 <?php for ($i = 0; $i <= $pickCount; $i++): ?>
                                     <option value="<?= $i ?>" <?= $def['even_min'] === $i ? 'selected' : '' ?>><?= $i ?></option>
@@ -236,7 +230,7 @@ $maxFreqHm = max(1, max(array_values($freqRows) ?: [1]));
                             </select>
                         </div>
                         <div class="form-group">
-                            <label class="form-label"><?= render_tooltip('even_count', $game) ?> max</label>
+                            <label class="form-label"><?= $kit->texts()->renderTooltip('even_count', $gameDef) ?> max</label>
                             <select name="even_max" class="form-select">
                                 <?php for ($i = 0; $i <= $pickCount; $i++): ?>
                                     <option value="<?= $i ?>" <?= $def['even_max'] === $i ? 'selected' : '' ?>><?= $i ?></option>
@@ -244,7 +238,7 @@ $maxFreqHm = max(1, max(array_values($freqRows) ?: [1]));
                             </select>
                         </div>
                         <div class="form-group">
-                            <label class="form-label"><?= render_tooltip('low_count', $game) ?> min</label>
+                            <label class="form-label"><?= $kit->texts()->renderTooltip('low_count', $gameDef) ?> min</label>
                             <select name="low_min" class="form-select">
                                 <?php for ($i = 0; $i <= $pickCount; $i++): ?>
                                     <option value="<?= $i ?>" <?= $def['low_min'] === $i ? 'selected' : '' ?>><?= $i ?></option>
@@ -252,7 +246,7 @@ $maxFreqHm = max(1, max(array_values($freqRows) ?: [1]));
                             </select>
                         </div>
                         <div class="form-group">
-                            <label class="form-label"><?= render_tooltip('low_count', $game) ?> max</label>
+                            <label class="form-label"><?= $kit->texts()->renderTooltip('low_count', $gameDef) ?> max</label>
                             <select name="low_max" class="form-select">
                                 <?php for ($i = 0; $i <= $pickCount; $i++): ?>
                                     <option value="<?= $i ?>" <?= $def['low_max'] === $i ? 'selected' : '' ?>><?= $i ?></option>
@@ -260,7 +254,7 @@ $maxFreqHm = max(1, max(array_values($freqRows) ?: [1]));
                             </select>
                         </div>
                         <div class="form-group">
-                            <label class="form-label"><?= render_tooltip('consecutive', $game) ?> maks.</label>
+                            <label class="form-label"><?= $kit->texts()->renderTooltip('consecutive', $gameDef) ?> maks.</label>
                             <select name="consec_max" class="form-select">
                                 <?php for ($i = 0; $i < $pickCount; $i++): ?>
                                     <option value="<?= $i ?>" <?= $def['consec_max'] === $i ? 'selected' : '' ?>><?= $i ?></option>
@@ -276,7 +270,7 @@ $maxFreqHm = max(1, max(array_values($freqRows) ?: [1]));
                             </select>
                         </div>
                         <div class="form-group">
-                            <label class="form-label"><?= render_tooltip('last_digit_unique', $game) ?> maks.</label>
+                            <label class="form-label"><?= $kit->texts()->renderTooltip('last_digit_unique', $gameDef) ?> maks.</label>
                             <select name="last_digit_max" class="form-select">
                                 <?php for ($i = 1; $i <= $pickCount; $i++): ?>
                                     <option value="<?= $i ?>" <?= $def['last_digit_max'] === $i ? 'selected' : '' ?>><?= $i ?></option>
@@ -284,19 +278,19 @@ $maxFreqHm = max(1, max(array_values($freqRows) ?: [1]));
                             </select>
                         </div>
                         <div class="form-group">
-                            <label class="form-label"><?= render_tooltip('decades_used', $game) ?> maks. z jednej</label>
+                            <label class="form-label"><?= $kit->texts()->renderTooltip('decades_used', $gameDef) ?> maks. z jednej</label>
                             <input type="number" name="decades_max" value="<?= h((string)$def['decades_max']) ?>" min="1" max="<?= $pickCount ?>" class="form-input">
                         </div>
                     </div>
 
                     <?php if (!empty($profileHashes)): ?>
                     <div style="margin-top:1rem;">
-                        <label class="form-label"><?= render_tooltip('profile_hash', $game) ?> (Ctrl+klik dla wielu)</label>
+                        <label class="form-label"><?= $kit->texts()->renderTooltip('profile_hash', $gameDef) ?> (Ctrl+klik dla wielu)</label>
                         <select name="profile_hashes[]" multiple size="5" class="form-select" style="height:auto;">
                             <?php foreach ($profileHashes as $ph): ?>
                                 <option value="<?= h($ph['profile_hash']) ?>"
                                     <?= in_array($ph['profile_hash'], $postedHashes, true) ? 'selected' : '' ?>>
-                                    <?= h(describe_profile_short($ph['profile_hash'])) ?>
+                                    <?= h($kit->describer()->describeShort($ph['profile_hash'])) ?>
                                     &nbsp;(<?= h((string)$ph['total_draws']) ?>x / <?= h((string)$ph['pct_of_total']) ?>%)
                                 </option>
                             <?php endforeach; ?>
@@ -325,10 +319,10 @@ $maxFreqHm = max(1, max(array_values($freqRows) ?: [1]));
                     if ($isHot) {
                         $bg = "var(--tertiary)";
                         $color = "var(--on-tertiary)";
-                    } elseif ($ratio > 0.7) {
+                    } elseif ($ratio > AnalysisConfig::GENERATOR_HEATMAP_HOT_RATIO) {
                         $bg = "var(--tertiary-fixed-dim)";
                         $color = "var(--on-tertiary-fixed)";
-                    } elseif ($ratio > 0.4) {
+                    } elseif ($ratio > AnalysisConfig::GENERATOR_HEATMAP_WARM_RATIO) {
                         $bg = "var(--secondary-container)";
                         $color = "var(--on-primary-fixed)";
                     } else {
@@ -413,7 +407,7 @@ $maxFreqHm = max(1, max(array_values($freqRows) ?: [1]));
                 Suma: <?= h((string)$r['metrics']['sum_total']) ?> &middot;
                 Parzyste: <?= h((string)$r['metrics']['even_count']) ?> &middot;
                 Niskie: <?= h((string)$r['metrics']['low_count']) ?> &middot;
-                <?= h(describe_profile_short($r['hash'])) ?>
+                <?= h($kit->describer()->describeShort($r['hash'])) ?>
             </span>
         </div>
         <div class="balls-row mb-3">
@@ -435,30 +429,30 @@ $maxFreqHm = max(1, max(array_values($freqRows) ?: [1]));
         $activeFilters  = [];
 
         if ($sumMin > $defaultSumMin || $sumMax < $defaultSumMax) {
-            $activeFilters[] = ['label' => metric_label('sum_total'), 'value' => $r['metrics']['sum_total'], 'range' => "{$sumMin}–{$sumMax}", 'ok' => ($r['metrics']['sum_total'] >= $sumMin && $r['metrics']['sum_total'] <= $sumMax)];
+            $activeFilters[] = ['label' => $kit->texts()->label('sum_total'), 'value' => $r['metrics']['sum_total'], 'range' => "{$sumMin}–{$sumMax}", 'ok' => ($r['metrics']['sum_total'] >= $sumMin && $r['metrics']['sum_total'] <= $sumMax)];
         } else {
-            $activeFilters[] = ['label' => metric_label('sum_total'), 'value' => $r['metrics']['sum_total'], 'range' => '—', 'ok' => true];
+            $activeFilters[] = ['label' => $kit->texts()->label('sum_total'), 'value' => $r['metrics']['sum_total'], 'range' => '—', 'ok' => true];
         }
         if ($evenMin > $defaultEvenMin || $evenMax < $defaultEvenMax) {
-            $activeFilters[] = ['label' => metric_label('even_count'), 'value' => $r['metrics']['even_count'], 'range' => "{$evenMin}–{$evenMax}", 'ok' => ($r['metrics']['even_count'] >= $evenMin && $r['metrics']['even_count'] <= $evenMax)];
+            $activeFilters[] = ['label' => $kit->texts()->label('even_count'), 'value' => $r['metrics']['even_count'], 'range' => "{$evenMin}–{$evenMax}", 'ok' => ($r['metrics']['even_count'] >= $evenMin && $r['metrics']['even_count'] <= $evenMax)];
         }
         if ($lowMin > $defaultLowMin || $lowMax < $defaultLowMax) {
-            $activeFilters[] = ['label' => metric_label('low_count'), 'value' => $r['metrics']['low_count'], 'range' => "{$lowMin}–{$lowMax}", 'ok' => ($r['metrics']['low_count'] >= $lowMin && $r['metrics']['low_count'] <= $lowMax)];
+            $activeFilters[] = ['label' => $kit->texts()->label('low_count'), 'value' => $r['metrics']['low_count'], 'range' => "{$lowMin}–{$lowMax}", 'ok' => ($r['metrics']['low_count'] >= $lowMin && $r['metrics']['low_count'] <= $lowMax)];
         }
         if ($consecMax < $defaultConsec) {
-            $activeFilters[] = ['label' => metric_label('consecutive'), 'value' => $r['metrics']['consecutive'], 'range' => "maks. {$consecMax}", 'ok' => ($r['metrics']['consecutive'] <= $consecMax)];
+            $activeFilters[] = ['label' => $kit->texts()->label('consecutive'), 'value' => $r['metrics']['consecutive'], 'range' => "maks. {$consecMax}", 'ok' => ($r['metrics']['consecutive'] <= $consecMax)];
         }
         if ($lastDigMax < $defaultLastDig) {
-            $activeFilters[] = ['label' => metric_label('last_digit_unique'), 'value' => $r['metrics']['last_digit_unique'], 'range' => "maks. {$lastDigMax}", 'ok' => ($r['metrics']['last_digit_unique'] <= $lastDigMax)];
+            $activeFilters[] = ['label' => $kit->texts()->label('last_digit_unique'), 'value' => $r['metrics']['last_digit_unique'], 'range' => "maks. {$lastDigMax}", 'ok' => ($r['metrics']['last_digit_unique'] <= $lastDigMax)];
         }
         if ($hotMin > $defaultHotMin) {
             $hotInCoupon = count(array_intersect($r['numbers'], $top10));
             $activeFilters[] = ['label' => 'Gorące (top-10)', 'value' => $hotInCoupon, 'range' => "min. {$hotMin}", 'ok' => ($hotInCoupon >= $hotMin)];
         }
         if (!empty($wantedHashes)) {
-            $activeFilters[] = ['label' => metric_label('profile_hash'), 'value' => describe_profile_short($r['hash']), 'range' => '(wybrany)', 'ok' => in_array($r['hash'], $wantedHashes, true)];
+            $activeFilters[] = ['label' => $kit->texts()->label('profile_hash'), 'value' => $kit->describer()->describeShort($r['hash']), 'range' => '(wybrany)', 'ok' => in_array($r['hash'], $wantedHashes, true)];
         } else {
-            $activeFilters[] = ['label' => metric_label('profile_hash'), 'value' => describe_profile_short($r['hash']), 'range' => '—', 'ok' => true];
+            $activeFilters[] = ['label' => $kit->texts()->label('profile_hash'), 'value' => $kit->describer()->describeShort($r['hash']), 'range' => '—', 'ok' => true];
         }
         ?>
         <details class="card-details">

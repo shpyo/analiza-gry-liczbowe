@@ -3,20 +3,17 @@ declare(strict_types=1);
 
 /**
  * validator.php - Validate / analyse a user-provided combination
- * Included by index.php; $pdo, $game are available.
+ * Included by index.php; $pdo, $game, $gameDef, $kit are available.
  */
 
-$gameConfig   = get_game_config($pdo, $game);
-$gameName     = $gameConfig['name'];
-$drawsTable   = GAME_TABLES[$game];
-$profileTable = PROFILE_TABLES[$game];
-$pickCount    = (int)$gameConfig['pick_count'];
-$poolSize     = (int)$gameConfig['pool_size'];
+$pickCount    = $gameDef->pickCount;
+$poolSize     = $gameDef->poolSize;
+$drawsTable   = $gameDef->drawsTable;
+$profileTable = $gameDef->profileTable;
 
 $errors    = [];
 $inputNums = [];
-$metrics   = null;
-$hash      = null;
+$analysis  = null;
 $profileRow = null;
 $exactMatch = null;
 $submitted  = false;
@@ -46,11 +43,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (empty($errors) && count($inputNums) === $pickCount) {
         sort($inputNums);
-        $metrics = compute_metrics($inputNums, $game);
-        $hash    = compute_profile_hash($metrics, $game);
+        $analysis = $kit->calculator()->analyze($inputNums, $gameDef, $kit->describer());
 
         $profStmt = $pdo->prepare("SELECT * FROM `{$profileTable}` WHERE profile_hash = ?");
-        $profStmt->execute([$hash]);
+        $profStmt->execute([$analysis->profileHash]);
         $profileRow = $profStmt->fetch();
 
         $conditions = [];
@@ -77,7 +73,7 @@ $totalDraws = (int)$pdo->query("SELECT COUNT(*) FROM `{$drawsTable}`")->fetchCol
     <div class="page-header__row">
         <div>
             <span class="text-label-md text-primary mb-2" style="display:block;">WERYFIKACJA</span>
-            <h1 class="page-header__title"><?= h($gameName) ?> &mdash; Weryfikator</h1>
+            <h1 class="page-header__title"><?= h($gameDef->name) ?> &mdash; Weryfikator</h1>
             <p class="page-header__desc">Wpisz kombinację <?= $pickCount ?> liczb z zakresu 1&ndash;<?= $poolSize ?>. System obliczy profil statystyczny, sprawdzi historię wzorca i unikatowość kombinacji.</p>
         </div>
     </div>
@@ -117,7 +113,7 @@ $totalDraws = (int)$pdo->query("SELECT COUNT(*) FROM `{$drawsTable}`")->fetchCol
     <?php endforeach; ?>
 <?php endif; ?>
 
-<?php if ($submitted && empty($errors) && $metrics !== null): ?>
+<?php if ($submitted && empty($errors) && $analysis !== null): ?>
 
 <!-- Results -->
 <div class="bento-grid">
@@ -143,36 +139,36 @@ $totalDraws = (int)$pdo->query("SELECT COUNT(*) FROM `{$drawsTable}`")->fetchCol
             </thead>
             <tbody>
                 <tr>
-                    <td><?= render_tooltip('sum_total', $game) ?></td>
-                    <td><strong><?= h((string)$metrics['sum_total']) ?></strong></td>
+                    <td><?= $kit->texts()->renderTooltip('sum_total', $gameDef) ?></td>
+                    <td><strong><?= h((string)$analysis->sumTotal) ?></strong></td>
                 </tr>
                 <tr>
-                    <td><?= render_tooltip('even_count', $game) ?> / <?= metric_label('odd_count') ?></td>
-                    <td><strong><?= h((string)$metrics['even_count']) ?></strong> / <?= h((string)($pickCount - $metrics['even_count'])) ?></td>
+                    <td><?= $kit->texts()->renderTooltip('even_count', $gameDef) ?> / <?= $kit->texts()->label('odd_count') ?></td>
+                    <td><strong><?= h((string)$analysis->evenCount) ?></strong> / <?= h((string)($pickCount - $analysis->evenCount)) ?></td>
                 </tr>
                 <tr>
-                    <td><?= render_tooltip('low_count', $game) ?> (&le; <?= (int)$gameConfig['low_threshold'] ?>) / <?= metric_label('high_count') ?></td>
-                    <td><strong><?= h((string)$metrics['low_count']) ?></strong> / <?= h((string)($pickCount - $metrics['low_count'])) ?></td>
+                    <td><?= $kit->texts()->renderTooltip('low_count', $gameDef) ?> (&le; <?= $gameDef->lowThreshold ?>) / <?= $kit->texts()->label('high_count') ?></td>
+                    <td><strong><?= h((string)$analysis->lowCount) ?></strong> / <?= h((string)($pickCount - $analysis->lowCount)) ?></td>
                 </tr>
                 <tr>
-                    <td><?= render_tooltip('consecutive', $game) ?></td>
-                    <td><strong><?= h((string)$metrics['consecutive']) ?></strong></td>
+                    <td><?= $kit->texts()->renderTooltip('consecutive', $gameDef) ?></td>
+                    <td><strong><?= h((string)$analysis->consecutive) ?></strong></td>
                 </tr>
                 <tr>
-                    <td><?= render_tooltip('decades_used', $game) ?></td>
-                    <td><strong><?= h((string)$metrics['decades_used']) ?></strong></td>
+                    <td><?= $kit->texts()->renderTooltip('decades_used', $gameDef) ?></td>
+                    <td><strong><?= h((string)$analysis->decadesUsed) ?></strong></td>
                 </tr>
                 <tr>
-                    <td><?= render_tooltip('range_spread', $game) ?></td>
-                    <td><strong><?= h((string)$metrics['range_spread']) ?></strong></td>
+                    <td><?= $kit->texts()->renderTooltip('range_spread', $gameDef) ?></td>
+                    <td><strong><?= h((string)$analysis->rangeSpread) ?></strong></td>
                 </tr>
                 <tr>
-                    <td><?= render_tooltip('last_digit_unique', $game) ?></td>
-                    <td><strong><?= h((string)$metrics['last_digit_unique']) ?></strong></td>
+                    <td><?= $kit->texts()->renderTooltip('last_digit_unique', $gameDef) ?></td>
+                    <td><strong><?= h((string)$analysis->lastDigitUnique) ?></strong></td>
                 </tr>
                 <tr>
-                    <td><?= render_tooltip('profile_hash', $game) ?></td>
-                    <td><strong><?= h(describe_profile_short($hash)) ?></strong></td>
+                    <td><?= $kit->texts()->renderTooltip('profile_hash', $gameDef) ?></td>
+                    <td><strong><?= h($analysis->descriptionShort) ?></strong></td>
                 </tr>
             </tbody>
         </table>
@@ -230,10 +226,10 @@ $totalDraws = (int)$pdo->query("SELECT COUNT(*) FROM `{$drawsTable}`")->fetchCol
         <section class="card">
             <h3 class="text-headline-md mb-3">Popularność wzorca</h3>
             <?php $pct = (float)$profileRow['pct_of_total']; ?>
-            <?php if ($pct > 2.0): ?>
+            <?php if ($pct > AnalysisConfig::PROFILE_POPULAR_PCT): ?>
                 <?= render_badge('Popularny', 'stable') ?>
                 <p class="text-body-sm text-on-surface-variant" style="margin-top:0.5rem;">Ten układ padał w <?= h((string)$profileRow['pct_of_total']) ?>% losowań — jeden z częstszych wzorców.</p>
-            <?php elseif ($pct >= 0.5): ?>
+            <?php elseif ($pct >= AnalysisConfig::PROFILE_RARE_PCT): ?>
                 <?= render_badge('Rzadki', 'rare') ?>
                 <p class="text-body-sm text-on-surface-variant" style="margin-top:0.5rem;">Ten układ padał w <?= h((string)$profileRow['pct_of_total']) ?>% losowań — niezbyt powszechny.</p>
             <?php else: ?>
@@ -241,7 +237,7 @@ $totalDraws = (int)$pdo->query("SELECT COUNT(*) FROM `{$drawsTable}`")->fetchCol
                 <p class="text-body-sm text-on-surface-variant" style="margin-top:0.5rem;">Ten układ padał zaledwie w <?= h((string)$profileRow['pct_of_total']) ?>% losowań.</p>
             <?php endif; ?>
             <div class="progress-bar" style="margin-top:0.75rem;">
-                <div class="progress-bar__fill" style="width:<?= min(100, $pct * 10) ?>%;"></div>
+                <div class="progress-bar__fill" style="width:<?= min(100, $pct * AnalysisConfig::PROFILE_BAR_MULTIPLIER) ?>%;"></div>
             </div>
         </section>
         <?php endif; ?>
@@ -253,7 +249,7 @@ $totalDraws = (int)$pdo->query("SELECT COUNT(*) FROM `{$drawsTable}`")->fetchCol
 <div class="card" style="margin-top:1.5rem;">
     <h3 class="text-headline-md mb-3">Opis profilu strukturalnego</h3>
     <p class="text-body-lg" style="line-height:1.8;">
-        <?= h(describe_profile($hash, $game)) ?>
+        <?= h($analysis->descriptionFull) ?>
     </p>
 </div>
 

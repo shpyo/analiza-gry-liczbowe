@@ -50,16 +50,19 @@ try {
     exit;
 }
 
+/** @deprecated Use GameDefinition->drawsTable instead */
 const GAME_TABLES = [
     'lotto'      => 'lotto_draws',
     'lotto_plus' => 'lotto_plus_draws',
     'mini_lotto' => 'mini_lotto_draws',
 ];
 
+/** @deprecated Use GameDefinition->profileTable instead */
 const PROFILE_TABLES = [
     'lotto'      => 'lotto_draw_profiles',
     'lotto_plus' => 'lotto_plus_draw_profiles',
     'mini_lotto' => 'mini_lotto_draw_profiles',
 ];
 
+/** @deprecated Use GameRegistry::allSlugs() instead */
 const GAMES = ['lotto', 'lotto_plus', 'mini_lotto'];

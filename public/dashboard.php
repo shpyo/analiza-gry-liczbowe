@@ -3,14 +3,12 @@ declare(strict_types=1);
 
 /**
  * dashboard.php - Overview for the current game
- * Included by index.php; $pdo, $game, $gameNames are available.
+ * Included by index.php; $pdo, $game, $gameDef, $kit, $gameNames are available.
  */
 
-$gameConfig = get_game_config($pdo, $game);
-$gameName   = $gameConfig['name'];
-$drawsTable = GAME_TABLES[$game];
-$pickCount  = (int)$gameConfig['pick_count'];
-$poolSize   = (int)$gameConfig['pool_size'];
+$pickCount  = $gameDef->pickCount;
+$poolSize   = $gameDef->poolSize;
+$drawsTable = $gameDef->drawsTable;
 
 // -----------------------------------------------------------------------
 // Last draw
@@ -20,22 +18,14 @@ $lastDraw = $pdo->query(
 )->fetch();
 
 // -----------------------------------------------------------------------
-// Hot / Cold numbers (last 500 draws)
+// Hot / Cold numbers (last N draws)
 // -----------------------------------------------------------------------
-$numberCols = [];
-for ($i = 1; $i <= $pickCount; $i++) {
-    $numberCols[] = "n{$i}";
-}
-
-$colList   = implode(', ', array_map(fn($c) => "`{$c}`", $numberCols));
-$cteParts  = [];
-foreach ($numberCols as $col) {
-    $cteParts[] = "SELECT `{$col}` AS num FROM last500";
-}
-$unionSql = implode(' UNION ALL ', $cteParts);
+$windowLimit = AnalysisConfig::WINDOW_SIZE;
+$colList  = $gameDef->numberColumnsSql();
+$unionSql = $gameDef->unpivotNumbersSql('last_window');
 
 $freqRows = $pdo->query(
-    "WITH last500 AS (SELECT {$colList} FROM `{$drawsTable}` ORDER BY draw_number DESC LIMIT 500)
+    "WITH last_window AS (SELECT {$colList} FROM `{$drawsTable}` ORDER BY draw_number DESC LIMIT {$windowLimit})
      SELECT num, COUNT(*) AS freq
      FROM ({$unionSql}) AS t
      WHERE num IS NOT NULL
@@ -43,8 +33,8 @@ $freqRows = $pdo->query(
      ORDER BY freq DESC"
 )->fetchAll();
 
-$hotNumbers  = array_slice($freqRows, 0, 5);
-$coldNumbers = array_slice(array_reverse($freqRows), 0, 3);
+$hotNumbers  = array_slice($freqRows, 0, AnalysisConfig::DISPLAY_DASHBOARD_HOT);
+$coldNumbers = array_slice(array_reverse($freqRows), 0, AnalysisConfig::DISPLAY_DASHBOARD_COLD);
 
 // -----------------------------------------------------------------------
 // Total draws count
@@ -74,9 +64,9 @@ if ($lastDraw) {
 <header class="page-header">
     <div class="page-header__row">
         <div>
-            <span class="text-label-md text-primary mb-2" style="display:block;"><?= h(strtoupper($gameName)) ?> DASHBOARD</span>
+            <span class="text-label-md text-primary mb-2" style="display:block;"><?= h(strtoupper($gameDef->name)) ?> DASHBOARD</span>
             <h1 class="page-header__title">Najnowsze wyniki losowania</h1>
-            <p class="page-header__desc">Kompleksowe zestawienie statystyczne najnowszego losowania <?= h($gameName) ?>. Analiza częstości, trendów i wzorców.</p>
+            <p class="page-header__desc">Kompleksowe zestawienie statystyczne najnowszego losowania <?= h($gameDef->name) ?>. Analiza częstości, trendów i wzorców.</p>
         </div>
         <div>
             <a href="?page=validator&game=<?= h($game) ?>" class="btn btn--secondary btn--lg">
@@ -111,7 +101,7 @@ if ($lastDraw) {
             <?php for ($i = 1; $i <= $pickCount; $i++): ?>
                 <?= render_ball((int)$lastDraw["n{$i}"], 'xl') ?>
             <?php endfor; ?>
-            <?php if ($game === 'lotto_plus' && $lastDraw['plus_ball'] !== null): ?>
+            <?php if ($gameDef->hasBonus && $lastDraw['plus_ball'] !== null): ?>
                 <?= render_ball((int)$lastDraw['plus_ball'], 'xl ball--plus') ?>
             <?php endif; ?>
         </div>

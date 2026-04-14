@@ -17,9 +17,10 @@ function get_game_config(PDO $pdo, string $game_slug): array
 }
 
 // ---------------------------------------------------------------------------
-// Metric computation
+// @deprecated - Use MetricCalculator::computeMetrics() instead
 // ---------------------------------------------------------------------------
 
+/** @deprecated Use MetricCalculator::computeMetrics() */
 function compute_metrics(array $numbers, string $game_slug): array
 {
     sort($numbers);
@@ -64,9 +65,10 @@ function compute_metrics(array $numbers, string $game_slug): array
 }
 
 // ---------------------------------------------------------------------------
-// Bucket helpers
+// @deprecated - Use GameDefinition->sumBuckets->classify() instead
 // ---------------------------------------------------------------------------
 
+/** @deprecated Use GameDefinition->sumBuckets->classify() */
 function sum_bucket(int $sum, string $game_slug): string
 {
     if ($game_slug === 'mini_lotto') {
@@ -76,7 +78,6 @@ function sum_bucket(int $sum, string $game_slug): string
         if ($sum <= 159) return 'L';
         return 'XL';
     }
-    // lotto / lotto_plus
     if ($sum <= 79)  return 'XS';
     if ($sum <= 109) return 'S';
     if ($sum <= 170) return 'M';
@@ -84,6 +85,7 @@ function sum_bucket(int $sum, string $game_slug): string
     return 'XL';
 }
 
+/** @deprecated Use GameDefinition->rangeBuckets->classify() */
 function range_bucket(int $range, string $game_slug): string
 {
     if ($game_slug === 'mini_lotto') {
@@ -93,7 +95,6 @@ function range_bucket(int $range, string $game_slug): string
         if ($range <= 37) return 'L';
         return 'XL';
     }
-    // lotto / lotto_plus
     if ($range <= 19) return 'XS';
     if ($range <= 29) return 'S';
     if ($range <= 39) return 'M';
@@ -102,9 +103,10 @@ function range_bucket(int $range, string $game_slug): string
 }
 
 // ---------------------------------------------------------------------------
-// Profile hash
+// @deprecated - Use ProfileDescriber::computeHash() instead
 // ---------------------------------------------------------------------------
 
+/** @deprecated Use ProfileDescriber::computeHash() */
 function compute_profile_hash(array $metrics, string $game_slug): string
 {
     $pickCount = ($game_slug === 'mini_lotto') ? 5 : 6;
@@ -119,10 +121,10 @@ function compute_profile_hash(array $metrics, string $game_slug): string
     return "{$even}e{$odd}o_{$low}l{$high}h_s{$sB}_c{$c}_r{$rB}";
 }
 
+/** @deprecated Use ProfileDescriber::parseHash() */
 function parse_profile_hash(string $hash): array
 {
     $parts = explode('_', $hash);
-    // parts[2] = 'sM', parts[4] = 'rL'
     $sumBucket   = isset($parts[2]) ? substr($parts[2], 1) : 'M';
     $rangeBucket = isset($parts[4]) ? substr($parts[4], 1) : 'M';
     return [
@@ -132,19 +134,19 @@ function parse_profile_hash(string $hash): array
 }
 
 // ---------------------------------------------------------------------------
-// mbnet line parser
+// @deprecated - Use MbnetLineParser::parse() instead
 // ---------------------------------------------------------------------------
 
+/** @deprecated Use GameDefinition->lineParser->parse() */
 function parse_mbnet_line(string $line, string $game_slug): ?array
 {
     $line = trim($line);
-    // Format: {number}. {dd.mm.yyyy} {n1},{n2},...
     if (!preg_match('/^(\d+)\.\s+(\d{2})\.(\d{2})\.(\d{4})\s+([\d,]+)$/', $line, $m)) {
         return null;
     }
 
     $drawNumber = (int)$m[1];
-    $drawDate   = $m[4] . '-' . $m[3] . '-' . $m[2]; // Y-m-d
+    $drawDate   = $m[4] . '-' . $m[3] . '-' . $m[2];
     $rawNums    = array_map('intval', explode(',', $m[5]));
 
     $pickCount = ($game_slug === 'mini_lotto') ? 5 : 6;
@@ -170,9 +172,10 @@ function parse_mbnet_line(string $line, string $game_slug): ?array
 }
 
 // ---------------------------------------------------------------------------
-// Insert draw
+// @deprecated - Use DrawRepository::insertDraw() instead
 // ---------------------------------------------------------------------------
 
+/** @deprecated Use DrawRepository::insertDraw() */
 function insert_draw(PDO $pdo, string $game_slug, array $parsed): bool
 {
     $table   = GAME_TABLES[$game_slug];
@@ -224,7 +227,6 @@ function insert_draw(PDO $pdo, string $game_slug, array $parsed): bool
             $hash,
         ];
     } else {
-        // lotto
         $sql = "INSERT IGNORE INTO `{$table}`
                     (draw_date, draw_number, n1, n2, n3, n4, n5, n6,
                      sum_total, even_count, low_count, consecutive,
@@ -253,9 +255,10 @@ function insert_draw(PDO $pdo, string $game_slug, array $parsed): bool
 }
 
 // ---------------------------------------------------------------------------
-// Rebuild profiles
+// @deprecated - Use DrawRepository::rebuildProfiles() instead
 // ---------------------------------------------------------------------------
 
+/** @deprecated Use DrawRepository::rebuildProfiles() */
 function rebuild_profiles(PDO $pdo, string $game_slug): void
 {
     $drawsTable   = GAME_TABLES[$game_slug];
@@ -304,7 +307,7 @@ function rebuild_profiles(PDO $pdo, string $game_slug): void
 }
 
 // ---------------------------------------------------------------------------
-// HTML escaping helper
+// HTML escaping helper (still used everywhere)
 // ---------------------------------------------------------------------------
 
 function h(string $val): string
@@ -313,34 +316,26 @@ function h(string $val): string
 }
 
 // ---------------------------------------------------------------------------
-// Heatmap colour helper
+// Heatmap colour helper (still used in stats.php)
 // ---------------------------------------------------------------------------
 
-/**
- * Returns bg and text CSS colour strings for a heatmap quintile bucket (0–4).
- * Bucket 0 = lowest 20%, bucket 4 = highest 20%.
- * Palette: pale green → green → yellow → orange → deep red.
- */
 function heatmap_bucket_color(int $bucket): array
 {
     $palette = [
-        0 => ['bg' => '#e7e8e9', 'text' => '#414754'], // Q1 surface-container-high (cold)
-        1 => ['bg' => '#90bafe', 'text' => '#001a41'], // Q2 secondary-container
-        2 => ['bg' => '#d8e2ff', 'text' => '#004493'], // Q3 primary-fixed
-        3 => ['bg' => '#ffb870', 'text' => '#2c1600'], // Q4 tertiary-fixed-dim (warm)
-        4 => ['bg' => '#8b5000', 'text' => '#ffffff'], // Q5 tertiary (hot)
+        0 => ['bg' => '#e7e8e9', 'text' => '#414754'],
+        1 => ['bg' => '#90bafe', 'text' => '#001a41'],
+        2 => ['bg' => '#d8e2ff', 'text' => '#004493'],
+        3 => ['bg' => '#ffb870', 'text' => '#2c1600'],
+        4 => ['bg' => '#8b5000', 'text' => '#ffffff'],
     ];
     return $palette[max(0, min(4, $bucket))];
 }
 
 // ---------------------------------------------------------------------------
-// Tooltip rendering (CSS-only, zero JS)
+// @deprecated tooltip rendering - Use MetricTextProvider::renderTooltip()
 // ---------------------------------------------------------------------------
 
-/**
- * Renders an <abbr title="..."> with the metric label and tooltip description.
- * Use as a table header or form label.
- */
+/** @deprecated Use MetricTextProvider::renderTooltip() */
 function render_tooltip(string $metric, string $game = 'lotto'): string
 {
     $label   = metric_label($metric);
@@ -351,7 +346,7 @@ function render_tooltip(string $metric, string $game = 'lotto'): string
 }
 
 // ---------------------------------------------------------------------------
-// Render helpers for the new design system
+// Render helpers for the design system (still used everywhere)
 // ---------------------------------------------------------------------------
 
 function render_ball(int $number, string $modifier = ''): string
@@ -372,44 +367,34 @@ function render_material_icon(string $name, string $extraClass = ''): string
 }
 
 // ---------------------------------------------------------------------------
-// Profile hash description helpers
+// @deprecated profile description helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Full human-readable description of a profile hash.
- * Example: "3 parzyste · 3 niskie · suma średnia (110–170) · 1 para sąsiadów · rozstęp duży (40–44)"
- */
+/** @deprecated Use ProfileDescriber::describe() */
 function describe_profile(string $hash, string $game = 'lotto'): string
 {
     $parts = explode('_', $hash);
     if (count($parts) < 5) {
-        return $hash; // graceful degradation
+        return $hash;
     }
 
-    // Part 0: {even}e{odd}o
     if (!preg_match('/^(\d+)e(\d+)o$/', $parts[0], $m0)) {
         return $hash;
     }
     $even = (int)$m0[1];
-    $odd  = (int)$m0[2];
 
-    // Part 1: {low}l{high}h
     if (!preg_match('/^(\d+)l(\d+)h$/', $parts[1], $m1)) {
         return $hash;
     }
-    $low  = (int)$m1[1];
-    $high = (int)$m1[2];
+    $low = (int)$m1[1];
 
-    // Part 2: s{bucket}
     $sumBucket = substr($parts[2] ?? 's?', 1);
 
-    // Part 3: c{consecutive}
     if (!preg_match('/^c(\d+)$/', $parts[3] ?? '', $m3)) {
         return $hash;
     }
     $consecutive = (int)$m3[1];
 
-    // Part 4: r{bucket}
     $rangeBucket = substr($parts[4] ?? 'r?', 1);
 
     $evenLabel = $even === 1 ? '1 parzysta' : "{$even} parzyste";
@@ -429,29 +414,22 @@ function describe_profile(string $hash, string $game = 'lotto'): string
     return implode(' · ', [$evenLabel, $lowLabel, $sumLabel, $consLabel, $rangeLabel]);
 }
 
-/**
- * Short description for compact UI (list selects, table cells).
- * Example: "3p/3n · sM · c1 · rL"
- */
+/** @deprecated Use ProfileDescriber::describeShort() */
 function describe_profile_short(string $hash): string
 {
     $parts = explode('_', $hash);
     if (count($parts) < 5) {
-        return $hash; // graceful degradation
+        return $hash;
     }
 
-    // Part 0: {even}e{odd}o → "3p/3n"
     if (!preg_match('/^(\d+)e(\d+)o$/', $parts[0], $m0)) {
         return $hash;
     }
-    $even = $m0[1];
-    $odd  = $m0[2];
 
-    // Part 3: c{n}
-    $consec = isset($parts[3]) ? $parts[3] : 'c?';
-
-    // Part 2: sX and part 4: rX — keep as-is (short codes)
-    $sumCode   = $parts[2] ?? 's?';
+    $even     = $m0[1];
+    $odd      = $m0[2];
+    $consec   = isset($parts[3]) ? $parts[3] : 'c?';
+    $sumCode  = $parts[2] ?? 's?';
     $rangeCode = $parts[4] ?? 'r?';
 
     return "{$even}p/{$odd}n · {$sumCode} · {$consec} · {$rangeCode}";

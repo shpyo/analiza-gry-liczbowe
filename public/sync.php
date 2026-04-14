@@ -8,6 +8,9 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/src/autoload.php';
+
+$kit = new GameKit($pdo);
 
 // Validate sync token
 $syncToken  = $envVars['SYNC_TOKEN'] ?? '';
@@ -23,26 +26,25 @@ if ($syncToken === '' || $givenToken !== $syncToken) {
 $targetGame = isset($_POST['game']) ? trim($_POST['game'])
     : (isset($_GET['game']) ? trim($_GET['game']) : null);
 
-if ($targetGame !== null && !in_array($targetGame, GAMES, true)) {
+$allSlugs = $kit->registry()->allSlugs();
+if ($targetGame !== null && !in_array($targetGame, $allSlugs, true)) {
     echo '<div class="alert alert-error">Invalid game: ' . h($targetGame) . '</div>';
     return;
 }
 
-$gamesToSync = $targetGame !== null ? [$targetGame] : GAMES;
+$gamesToSync = $targetGame !== null ? [$targetGame] : $allSlugs;
 
 echo '<header class="page-header"><div><span class="text-label-md text-primary mb-2" style="display:block;">ADMINISTRACJA</span>';
 echo '<h1 class="page-header__title">Synchronizacja losowań</h1></div></header>';
 
 foreach ($gamesToSync as $slug) {
-    $gameConfig = get_game_config($pdo, $slug);
-    $url        = $gameConfig['sync_url'];
-    $gameName   = $gameConfig['name'];
+    $gameDef    = $kit->game($slug);
+    $drawsTable = $gameDef->drawsTable;
 
     echo '<div class="card mb-4">';
-    echo '<h2 class="text-headline-md mb-3">' . h($gameName) . '</h2>';
+    echo '<h2 class="text-headline-md mb-3">' . h($gameDef->name) . '</h2>';
 
-    $drawsTable  = GAME_TABLES[$slug];
-    $maxDrawNum  = (int)$pdo->query("SELECT COALESCE(MAX(draw_number),0) FROM `{$drawsTable}`")->fetchColumn();
+    $maxDrawNum = (int)$pdo->query("SELECT COALESCE(MAX(draw_number),0) FROM `{$drawsTable}`")->fetchColumn();
 
     $context = stream_context_create([
         'http' => [
@@ -56,11 +58,11 @@ foreach ($gamesToSync as $slug) {
     $inserted = 0;
     $lastNum  = $maxDrawNum;
 
-    $content = @file_get_contents($url, false, $context);
+    $content = @file_get_contents($gameDef->syncUrl, false, $context);
 
     if ($content === false) {
         $status = 'error';
-        $errMsg = "Failed to fetch data from {$url}";
+        $errMsg = "Failed to fetch data from {$gameDef->syncUrl}";
         echo '<div class="alert alert-error">' . h($errMsg) . '</div>';
     } else {
         $lines = explode("\n", $content);
@@ -70,14 +72,14 @@ foreach ($gamesToSync as $slug) {
             if ($line === '') {
                 continue;
             }
-            $parsed = parse_mbnet_line($line, $slug);
+            $parsed = $gameDef->lineParser->parse($line);
             if ($parsed === null) {
                 continue;
             }
             if ($parsed['draw_number'] <= $maxDrawNum) {
                 continue;
             }
-            if (insert_draw($pdo, $slug, $parsed)) {
+            if ($kit->repository()->insertDraw($gameDef, $parsed, $kit->calculator(), $kit->describer())) {
                 $inserted++;
                 if ($parsed['draw_number'] > $lastNum) {
                     $lastNum = $parsed['draw_number'];
@@ -90,7 +92,7 @@ foreach ($gamesToSync as $slug) {
         }
 
         if ($inserted > 0) {
-            rebuild_profiles($pdo, $slug);
+            $kit->repository()->rebuildProfiles($gameDef, $kit->describer());
         }
 
         $summary = $inserted > 0
@@ -107,7 +109,7 @@ foreach ($gamesToSync as $slug) {
             "INSERT INTO sync_log (game_slug, draws_added, last_draw_number, source_url, status, error_msg)
              VALUES (?, ?, ?, ?, ?, ?)"
         );
-        $logStmt->execute([$slug, $inserted, $lastNum, $url, $status, $errMsg]);
+        $logStmt->execute([$slug, $inserted, $lastNum, $gameDef->syncUrl, $status, $errMsg]);
     } catch (PDOException $e) {
         // Non-fatal: log failure silently
     }

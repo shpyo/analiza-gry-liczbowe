@@ -3,14 +3,12 @@ declare(strict_types=1);
 
 /**
  * stats.php - Per-number frequency statistics
- * Included by index.php; $pdo, $game are available.
+ * Included by index.php; $pdo, $game, $gameDef, $kit are available.
  */
 
-$gameConfig = get_game_config($pdo, $game);
-$gameName   = $gameConfig['name'];
-$drawsTable = GAME_TABLES[$game];
-$pickCount  = (int)$gameConfig['pick_count'];
-$poolSize   = (int)$gameConfig['pool_size'];
+$pickCount  = $gameDef->pickCount;
+$poolSize   = $gameDef->poolSize;
+$drawsTable = $gameDef->drawsTable;
 
 // -----------------------------------------------------------------------
 // Sort params
@@ -34,10 +32,7 @@ if ($dateTo !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) {
 // -----------------------------------------------------------------------
 // Build number columns
 // -----------------------------------------------------------------------
-$numberCols = [];
-for ($i = 1; $i <= $pickCount; $i++) {
-    $numberCols[] = "n{$i}";
-}
+$numberCols = $gameDef->numberColumns();
 
 // -----------------------------------------------------------------------
 // Get total draws count (with optional date filter)
@@ -91,15 +86,12 @@ foreach ($totalFreqStmt->fetchAll() as $row) {
     $totalFreqMap[(int)$row['num']] = (int)$row['freq'];
 }
 
-// Window frequency (last 500 draws)
-$winColList  = implode(', ', array_map(fn($c) => "`{$c}`", $numberCols));
-$winCteParts = [];
-foreach ($numberCols as $col) {
-    $winCteParts[] = "SELECT `{$col}` AS num FROM last500";
-}
-$unionWinSQL = implode(' UNION ALL ', $winCteParts);
+// Window frequency (last N draws)
+$windowLimit = AnalysisConfig::WINDOW_SIZE;
+$colList   = $gameDef->numberColumnsSql();
+$unionWinSQL = $gameDef->unpivotNumbersSql('last_window');
 $winFreqRows = $pdo->query(
-    "WITH last500 AS (SELECT {$winColList} FROM `{$drawsTable}` ORDER BY draw_number DESC LIMIT 500)
+    "WITH last_window AS (SELECT {$colList} FROM `{$drawsTable}` ORDER BY draw_number DESC LIMIT {$windowLimit})
      SELECT num, COUNT(*) AS freq FROM ({$unionWinSQL}) AS t WHERE num IS NOT NULL GROUP BY num"
 )->fetchAll();
 foreach ($winFreqRows as $row) {
@@ -130,6 +122,12 @@ foreach ($numberCols as $col) {
 $avgWindowFreq = count($windowFreqMap) > 0
     ? array_sum($windowFreqMap) / count($windowFreqMap)
     : 0;
+
+// Standard deviation (binomial model): σ = √(n × p × (1-p))
+$windowSize = min(AnalysisConfig::WINDOW_SIZE, $totalDraws);
+$p = $poolSize > 0 ? $pickCount / $poolSize : 0;
+$stdDevWindowFreq = $windowSize > 0 ? sqrt($windowSize * $p * (1 - $p)) : 1;
+$zScore = AnalysisConfig::TEMPERATURE_Z_SCORE;
 
 $stats = [];
 for ($n = 1; $n <= $poolSize; $n++) {
@@ -186,8 +184,8 @@ function sort_arrow(string $col): string
 // -----------------------------------------------------------------------
 $sortedByFreq = $stats;
 usort($sortedByFreq, fn($a, $b) => $b['window_freq'] <=> $a['window_freq']);
-$topHot  = array_slice($sortedByFreq, 0, 4);
-$topCold = array_slice(array_reverse($sortedByFreq), 0, 3);
+$topHot  = array_slice($sortedByFreq, 0, AnalysisConfig::DISPLAY_STATS_HOT);
+$topCold = array_slice(array_reverse($sortedByFreq), 0, AnalysisConfig::DISPLAY_STATS_COLD);
 $maxFreq = max(1, max(array_column($stats, 'window_freq')));
 
 // Quintile thresholds for heatmap
@@ -198,26 +196,27 @@ for ($n = 1; $n <= $poolSize; $n++) {
 sort($_heatFreqs);
 $_heatCnt = count($_heatFreqs);
 $_heatQ = [];
-for ($_qi = 1; $_qi <= 4; $_qi++) {
-    $idx = (int)floor($_heatCnt * $_qi / 5);
+$_quintiles = AnalysisConfig::HEATMAP_QUINTILE_COUNT;
+for ($_qi = 1; $_qi < $_quintiles; $_qi++) {
+    $idx = (int)floor($_heatCnt * $_qi / $_quintiles);
     $_heatQ[] = $_heatFreqs[min($idx, $_heatCnt - 1)];
 }
 
 function _heatmap_bucket(int $freq, array $q): int {
-    for ($i = 0; $i < 4; $i++) {
+    for ($i = 0, $count = count($q); $i < $count; $i++) {
         if ($freq <= $q[$i]) return $i;
     }
-    return 4;
+    return count($q);
 }
 
-// Compute overall odd/even/low/high from last 500 draws
+// Compute overall odd/even/low/high from last N draws
 $evenTotal = 0;
 $lowTotal  = 0;
-$drawCount500 = min(500, $totalDraws);
+$drawCount500 = min($windowLimit, $totalDraws);
 if ($drawCount500 > 0) {
     $distRow = $pdo->query(
         "SELECT SUM(even_count) AS total_even, SUM(low_count) AS total_low
-         FROM (SELECT even_count, low_count FROM `{$drawsTable}` ORDER BY draw_number DESC LIMIT 500) AS sub"
+         FROM (SELECT even_count, low_count FROM `{$drawsTable}` ORDER BY draw_number DESC LIMIT {$windowLimit}) AS sub"
     )->fetch();
     $evenTotal = (int)($distRow['total_even'] ?? 0);
     $lowTotal  = (int)($distRow['total_low'] ?? 0);
@@ -229,7 +228,7 @@ $lowPct  = $totalNums500 > 0 ? round($lowTotal / $totalNums500 * 100) : 50;
 $highPct = 100 - $lowPct;
 
 // Probability index for hot numbers
-$probIndex = $maxFreq > 0 ? round($topHot[0]['window_freq'] / (500 * $pickCount / $poolSize) * 100, 1) : 0;
+$probIndex = $maxFreq > 0 ? round($topHot[0]['window_freq'] / ($windowLimit * $pickCount / $poolSize) * 100, 1) : 0;
 ?>
 
 <!-- Page Header -->
@@ -237,7 +236,7 @@ $probIndex = $maxFreq > 0 ? round($topHot[0]['window_freq'] / (500 * $pickCount 
     <div class="page-header__row">
         <div>
             <span class="text-label-md text-primary mb-2" style="display:block;">ZAAWANSOWANE METRYKI</span>
-            <h1 class="page-header__title">Analiza statystyczna <?= h($gameName) ?></h1>
+            <h1 class="page-header__title">Analiza statystyczna <?= h($gameDef->name) ?></h1>
             <p class="page-header__desc">Kompleksowe zestawienie częstości, rozkładów i zaległości dla każdej liczby w puli <?= h((string)$poolSize) ?> liczb.</p>
         </div>
     </div>
@@ -354,13 +353,13 @@ $probIndex = $maxFreq > 0 ? round($topHot[0]['window_freq'] / (500 * $pickCount 
             <div>
                 <div class="dist-bars">
                     <div class="dist-bar">
-                        <span class="dist-bar__label">Wysokie (<?= ((int)$gameConfig['low_threshold'] + 1) ?>-<?= $poolSize ?>)</span>
+                        <span class="dist-bar__label">Wysokie (<?= ($gameDef->lowThreshold + 1) ?>-<?= $poolSize ?>)</span>
                         <div class="dist-bar__track">
                             <div class="dist-bar__fill dist-bar__fill--primary" style="width:<?= $highPct ?>%;"><?= $highPct ?>%</div>
                         </div>
                     </div>
                     <div class="dist-bar">
-                        <span class="dist-bar__label">Niskie (1-<?= (int)$gameConfig['low_threshold'] ?>)</span>
+                        <span class="dist-bar__label">Niskie (1-<?= $gameDef->lowThreshold ?>)</span>
                         <div class="dist-bar__track">
                             <div class="dist-bar__fill dist-bar__fill--secondary" style="width:<?= $lowPct ?>%;"><?= $lowPct ?>%</div>
                         </div>
@@ -411,21 +410,21 @@ $probIndex = $maxFreq > 0 ? round($topHot[0]['window_freq'] / (500 * $pickCount 
         <thead>
             <tr>
                 <th><a href="<?= h(stats_sort_url('num')) ?>">Liczba<?= sort_arrow('num') ?></a></th>
-                <th><a href="<?= h(stats_sort_url('total_freq')) ?>"><?= render_tooltip('total_freq', $game) ?><?= sort_arrow('total_freq') ?></a></th>
-                <th><a href="<?= h(stats_sort_url('window_freq')) ?>"><?= render_tooltip('window_freq', $game) ?><?= sort_arrow('window_freq') ?></a></th>
+                <th><a href="<?= h(stats_sort_url('total_freq')) ?>"><?= $kit->texts()->renderTooltip('total_freq', $gameDef) ?><?= sort_arrow('total_freq') ?></a></th>
+                <th><a href="<?= h(stats_sort_url('window_freq')) ?>"><?= $kit->texts()->renderTooltip('window_freq', $gameDef) ?><?= sort_arrow('window_freq') ?></a></th>
                 <th>Częstość</th>
                 <th>Trend</th>
                 <th>Status</th>
-                <th><a href="<?= h(stats_sort_url('current_gap')) ?>"><?= render_tooltip('current_gap', $game) ?><?= sort_arrow('current_gap') ?></a></th>
-                <th><a href="<?= h(stats_sort_url('overdue_score')) ?>"><?= render_tooltip('overdue_score', $game) ?><?= sort_arrow('overdue_score') ?></a></th>
+                <th><a href="<?= h(stats_sort_url('current_gap')) ?>"><?= $kit->texts()->renderTooltip('current_gap', $gameDef) ?><?= sort_arrow('current_gap') ?></a></th>
+                <th><a href="<?= h(stats_sort_url('overdue_score')) ?>"><?= $kit->texts()->renderTooltip('overdue_score', $gameDef) ?><?= sort_arrow('overdue_score') ?></a></th>
             </tr>
         </thead>
         <tbody>
         <?php foreach ($stats as $row): ?>
             <?php
             // Temperature / status classification
-            $isHot      = $row['window_freq'] > $avgWindowFreq * 1.2;
-            $isCold     = $row['window_freq'] < $avgWindowFreq * 0.8;
+            $isHot      = $row['window_freq'] > $avgWindowFreq + $zScore * $stdDevWindowFreq;
+            $isCold     = $row['window_freq'] < $avgWindowFreq - $zScore * $stdDevWindowFreq;
             $isInactive = $row['window_freq'] == 0;
 
             if ($isInactive) {
@@ -461,7 +460,7 @@ $probIndex = $maxFreq > 0 ? round($topHot[0]['window_freq'] / (500 * $pickCount 
                 <td><?= $trendIcon ?></td>
                 <td><?= $statusBadge ?></td>
                 <td><?= h((string)$row['current_gap']) ?></td>
-                <td<?= $row['overdue_score'] > 2.0 ? ' style="color:var(--error);font-weight:700;"' : ($row['overdue_score'] > 1.0 ? ' style="color:var(--tertiary);"' : '') ?>><?= h((string)$row['overdue_score']) ?></td>
+                <td<?= $row['overdue_score'] > AnalysisConfig::OVERDUE_CRITICAL ? ' style="color:var(--error);font-weight:700;"' : ($row['overdue_score'] > AnalysisConfig::OVERDUE_WARNING ? ' style="color:var(--tertiary);"' : '') ?>><?= h((string)$row['overdue_score']) ?></td>
             </tr>
         <?php endforeach; ?>
         </tbody>

@@ -4,6 +4,12 @@ declare(strict_types=1);
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/texts.php';
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/src/autoload.php';
+
+// -----------------------------------------------------------------------
+// Bootstrap GameKit
+// -----------------------------------------------------------------------
+$kit = new GameKit($pdo);
 
 // -----------------------------------------------------------------------
 // Routing
@@ -14,16 +20,13 @@ if (!in_array($page, $allowedPages, true)) {
     $page = 'dashboard';
 }
 
-$game = isset($_GET['game']) ? trim($_GET['game']) : 'lotto';
-if (!in_array($game, GAMES, true)) {
-    $game = 'lotto';
-}
+$gameDef = $kit->gameFromRequest();
+$game    = $gameDef->slug;
 
-$gameNames = [
-    'lotto'      => 'Lotto',
-    'lotto_plus' => 'Lotto Plus',
-    'mini_lotto' => 'Mini Lotto',
-];
+$gameNames = [];
+foreach ($kit->registry()->allSlugs() as $_slug) {
+    $gameNames[$_slug] = $kit->game($_slug)->name;
+}
 ?>
 <!DOCTYPE html>
 <html lang="pl">

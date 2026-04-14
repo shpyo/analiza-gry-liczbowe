@@ -15,6 +15,9 @@ if (!$isCli) {
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/src/autoload.php';
+
+$kit = new GameKit($pdo);
 
 // Determine which game(s) to import
 $targetGame = null;
@@ -24,8 +27,9 @@ if ($isCli) {
     $targetGame = isset($_GET['game']) ? trim($_GET['game']) : null;
 }
 
-if ($targetGame !== null && !in_array($targetGame, GAMES, true)) {
-    $msg = 'Invalid game slug: ' . h($targetGame);
+$allSlugs = $kit->registry()->allSlugs();
+if ($targetGame !== null && !in_array($targetGame, $allSlugs, true)) {
+    $msg = 'Invalid game slug: ' . ($isCli ? ($targetGame ?? '') : h($targetGame ?? ''));
     if ($isCli) {
         echo $msg . "\n";
     } else {
@@ -34,7 +38,7 @@ if ($targetGame !== null && !in_array($targetGame, GAMES, true)) {
     return;
 }
 
-$gamesToProcess = $targetGame !== null ? [$targetGame] : GAMES;
+$gamesToProcess = $targetGame !== null ? [$targetGame] : $allSlugs;
 
 if (!$isCli) {
     echo '<header class="page-header"><div><span class="text-label-md text-primary mb-2" style="display:block;">ADMINISTRACJA</span>';
@@ -43,16 +47,14 @@ if (!$isCli) {
 }
 
 foreach ($gamesToProcess as $slug) {
-    $gameConfig = get_game_config($pdo, $slug);
-    $url        = $gameConfig['sync_url'];
-    $gameName   = $gameConfig['name'];
+    $gameDef = $kit->game($slug);
 
     if ($isCli) {
-        echo "=== Importing {$gameName} from {$url} ===\n";
+        echo "=== Importing {$gameDef->name} from {$gameDef->syncUrl} ===\n";
     } else {
         echo '<div class="card mb-4">';
-        echo '<h2 class="text-headline-md mb-3">' . h($gameName) . '</h2>';
-        echo '<p class="text-body-sm text-on-surface-variant mb-4">Pobieranie z <code>' . h($url) . '</code>...</p>';
+        echo '<h2 class="text-headline-md mb-3">' . h($gameDef->name) . '</h2>';
+        echo '<p class="text-body-sm text-on-surface-variant mb-4">Pobieranie z <code>' . h($gameDef->syncUrl) . '</code>...</p>';
     }
 
     $context = stream_context_create([
@@ -62,10 +64,10 @@ foreach ($gamesToProcess as $slug) {
         ],
     ]);
 
-    $content = @file_get_contents($url, false, $context);
+    $content = @file_get_contents($gameDef->syncUrl, false, $context);
 
     if ($content === false) {
-        $errMsg = "Failed to fetch data from {$url}";
+        $errMsg = "Failed to fetch data from {$gameDef->syncUrl}";
         if ($isCli) {
             echo "ERROR: {$errMsg}\n";
         } else {
@@ -84,19 +86,19 @@ foreach ($gamesToProcess as $slug) {
         if ($line === '') {
             continue;
         }
-        $parsed = parse_mbnet_line($line, $slug);
+        $parsed = $gameDef->lineParser->parse($line);
         if ($parsed === null) {
             $errors++;
             continue;
         }
-        if (insert_draw($pdo, $slug, $parsed)) {
+        if ($kit->repository()->insertDraw($gameDef, $parsed, $kit->calculator(), $kit->describer())) {
             $inserted++;
         } else {
             $skipped++;
         }
     }
 
-    rebuild_profiles($pdo, $slug);
+    $kit->repository()->rebuildProfiles($gameDef, $kit->describer());
 
     $summary = "Wstawiono: {$inserted}, Już istniało: {$skipped}, Błędy parsowania: {$errors}";
     if ($isCli) {

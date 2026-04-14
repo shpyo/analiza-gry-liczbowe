@@ -37,6 +37,7 @@ function metric_label(string $key): string
     return METRIC_LABELS[$key] ?? $key;
 }
 
+/** @deprecated Use MetricTextProvider::tooltip() */
 function metric_tooltip(string $key, string $game = 'lotto'): string
 {
     $lowThreshold = ($game === 'mini_lotto') ? 21 : 24;
@@ -119,6 +120,7 @@ function metric_tooltip(string $key, string $game = 'lotto'): string
 // Buckety sumy — polskie nazwy z zakresami
 // ---------------------------------------------------------------------------
 
+/** @deprecated Use MetricTextProvider::sumBucketLabel() */
 function sum_bucket_label(string $bucket, string $game = 'lotto'): string
 {
     if ($game === 'mini_lotto') {
@@ -145,6 +147,7 @@ function sum_bucket_label(string $bucket, string $game = 'lotto'): string
 // Buckety rozstępu — polskie nazwy z zakresami
 // ---------------------------------------------------------------------------
 
+/** @deprecated Use MetricTextProvider::rangeBucketLabel() */
 function range_bucket_label(string $bucket, string $game = 'lotto'): string
 {
     if ($game === 'mini_lotto') {

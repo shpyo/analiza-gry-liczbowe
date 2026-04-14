@@ -6,10 +6,8 @@ declare(strict_types=1);
  * Included by index.php; $pdo, $game are available.
  */
 
-$gameConfig = get_game_config($pdo, $game);
-$gameName   = $gameConfig['name'];
-$drawsTable = GAME_TABLES[$game];
-$pickCount  = (int)$gameConfig['pick_count'];
+$pickCount  = $gameDef->pickCount;
+$drawsTable = $gameDef->drawsTable;
 
 // -----------------------------------------------------------------------
 // Filters
@@ -26,7 +24,7 @@ if ($dateTo !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) {
 // -----------------------------------------------------------------------
 // Pagination
 // -----------------------------------------------------------------------
-$perPage = 50;
+$perPage = AnalysisConfig::DRAWS_PER_PAGE;
 $currentPage = max(1, (int)($_GET['p'] ?? 1));
 
 // -----------------------------------------------------------------------
@@ -85,7 +83,7 @@ function draws_url(array $overrides = []): string
     <div class="page-header__row">
         <div>
             <span class="text-label-md text-primary mb-2" style="display:block;">HISTORIA LOSOWAŃ</span>
-            <h1 class="page-header__title"><?= h($gameName) ?> &mdash; Losowania</h1>
+            <h1 class="page-header__title"><?= h($gameDef->name) ?> &mdash; Losowania</h1>
             <p class="page-header__desc">Pełna historia losowań z metrykami statystycznymi i profilami strukturalnymi.</p>
         </div>
     </div>
@@ -128,14 +126,14 @@ function draws_url(array $overrides = []): string
                 <th>#</th>
                 <th>Data</th>
                 <th>Liczby</th>
-                <?php if ($game === 'lotto_plus'): ?>
+                <?php if ($gameDef->hasBonus): ?>
                 <th>Plus</th>
                 <?php endif; ?>
-                <th><?= render_tooltip('sum_total', $game) ?></th>
-                <th><?= render_tooltip('even_count', $game) ?></th>
-                <th><?= render_tooltip('low_count', $game) ?></th>
-                <th><?= render_tooltip('range_spread', $game) ?></th>
-                <th><?= render_tooltip('profile_hash', $game) ?></th>
+                <th><?= $kit->texts()->renderTooltip('sum_total', $gameDef) ?></th>
+                <th><?= $kit->texts()->renderTooltip('even_count', $gameDef) ?></th>
+                <th><?= $kit->texts()->renderTooltip('low_count', $gameDef) ?></th>
+                <th><?= $kit->texts()->renderTooltip('range_spread', $gameDef) ?></th>
+                <th><?= $kit->texts()->renderTooltip('profile_hash', $gameDef) ?></th>
             </tr>
         </thead>
         <tbody>
@@ -150,7 +148,7 @@ function draws_url(array $overrides = []): string
                         <?php endfor; ?>
                     </div>
                 </td>
-                <?php if ($game === 'lotto_plus'): ?>
+                <?php if ($gameDef->hasBonus): ?>
                 <td>
                     <?php if ($row['plus_ball'] !== null): ?>
                         <?= render_ball((int)$row['plus_ball'], 'plus') ?>
@@ -161,7 +159,7 @@ function draws_url(array $overrides = []): string
                 <td><?= h((string)$row['even_count']) ?></td>
                 <td><?= h((string)$row['low_count']) ?></td>
                 <td><?= h((string)$row['range_spread']) ?></td>
-                <td><span class="text-body-sm text-on-surface-variant"><?= h(describe_profile_short((string)$row['profile_hash'])) ?></span></td>
+                <td><span class="text-body-sm text-on-surface-variant"><?= h($kit->describer()->describeShort((string)$row['profile_hash'])) ?></span></td>
             </tr>
         <?php endforeach; ?>
         </tbody>
@@ -171,7 +169,8 @@ function draws_url(array $overrides = []): string
 <?php if ($totalPages > 1): ?>
 <div class="pagination">
     <?php
-    $range = range(max(1, $currentPage - 4), min($totalPages, $currentPage + 4));
+    $pgRange = AnalysisConfig::PAGINATION_RANGE;
+    $range = range(max(1, $currentPage - $pgRange), min($totalPages, $currentPage + $pgRange));
     if ($currentPage > 1):
     ?>
         <a href="<?= h(draws_url(['p' => 1])) ?>">&laquo;</a>
