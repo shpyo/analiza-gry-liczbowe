@@ -268,10 +268,9 @@ $probIndex = $maxFreq > 0 ? round($topHot[0]['window_freq'] / ($windowLimit * $p
 </form>
 
 <!-- Bento Grid: Top Cards -->
-<div class="bento-grid mb-8">
-
-    <!-- Frequency Distribution (col-span-8) -->
-    <section class="card col-md-8 col-lg-8">
+<div style="display:flex;flex-direction:column;gap:2rem;margin-bottom:2rem;">
+    <!-- Frequency Distribution -->
+    <section class="card">
         <div class="flex justify-between items-center mb-6" style="flex-wrap:wrap;gap:0.5rem;">
             <div>
                 <h2 class="text-headline-md">Rozkład częstości</h2>
@@ -293,81 +292,83 @@ $probIndex = $maxFreq > 0 ? round($topHot[0]['window_freq'] / ($windowLimit * $p
         </div>
     </section>
 
-    <!-- Hot Numbers (col-span-4) -->
-    <section class="card card--accent col-md-4 col-lg-4" style="display:flex;flex-direction:column;">
-        <div class="flex items-center gap-3 mb-4">
-            <?= render_material_icon('local_fire_department', 'icon-filled') ?>
-            <h2 class="text-headline-md" style="color:var(--on-tertiary-fixed-variant);">Gorące liczby</h2>
-        </div>
-        <div class="balls-row mb-4" style="justify-content:center;gap:0.75rem;">
-            <?php foreach ($topHot as $h): ?>
-                <?= render_ball($h['num'], 'md ball--hot') ?>
-            <?php endforeach; ?>
-        </div>
-        <div style="background:rgba(255,255,255,0.2);backdrop-filter:blur(8px);border-radius:var(--radius-xl);padding:1rem;margin-top:auto;">
-            <span class="text-label-lg" style="color:var(--on-tertiary-fixed-variant);">INDEKS PRAWDOPODOBIEŃSTWA</span>
-            <div style="font-size:1.5rem;font-weight:900;font-family:var(--font-headline);color:var(--on-tertiary-fixed);"><?= h((string)$probIndex) ?>%</div>
-            <div class="progress-bar" style="margin-top:0.5rem;background:rgba(0,0,0,0.1);">
-                <div class="progress-bar__fill progress-bar__fill--tertiary" style="width:<?= min(100, $probIndex) ?>%;"></div>
+    <div style="display:flex;justify-content:space-between;">
+        <!-- Hot Numbers (col-span-4) -->
+        <section class="card card--accent" style="display:flex;flex-direction:column;">
+            <div class="flex items-center gap-3 mb-4">
+                <?= render_material_icon('local_fire_department', 'icon-filled') ?>
+                <h2 class="text-headline-md" style="color:var(--on-tertiary-fixed-variant);">Gorące liczby</h2>
             </div>
-        </div>
-    </section>
-
-    <!-- Cold Numbers (col-span-4) -->
-    <section class="card card--surface-high col-md-4 col-lg-4">
-        <div class="flex items-center gap-3 mb-4">
-            <?= render_material_icon('ac_unit') ?>
-            <h2 class="text-headline-md">Zimne liczby</h2>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:0.75rem;">
-            <?php foreach ($topCold as $c): ?>
-            <div class="cold-item">
-                <span class="cold-item__ball"><?= str_pad((string)$c['num'], 2, '0', STR_PAD_LEFT) ?></span>
-                <span class="cold-item__info">Przerwa: <?= h((string)$c['current_gap']) ?> losowań</span>
-                <?= render_badge('Rzadka', 'rare') ?>
+            <div class="balls-row mb-4" style="justify-content:center;gap:0.75rem;">
+                <?php foreach ($topHot as $h): ?>
+                    <?= render_ball($h['num'], 'md ball--hot') ?>
+                <?php endforeach; ?>
             </div>
-            <?php endforeach; ?>
-        </div>
-    </section>
+            <div style="background:rgba(255,255,255,0.2);backdrop-filter:blur(8px);border-radius:var(--radius-xl);padding:1rem;margin-top:auto;">
+                <span class="text-label-lg" style="color:var(--on-tertiary-fixed-variant);">INDEKS PRAWDOPODOBIEŃSTWA</span>
+                <div style="font-size:1.5rem;font-weight:900;font-family:var(--font-headline);color:var(--on-tertiary-fixed);"><?= h((string)$probIndex) ?>%</div>
+                <div class="progress-bar" style="margin-top:0.5rem;background:rgba(0,0,0,0.1);">
+                    <div class="progress-bar__fill progress-bar__fill--tertiary" style="width:<?= min(100, $probIndex) ?>%;"></div>
+                </div>
+            </div>
+        </section>
 
-    <!-- Odd/Even Split (col-span-8) -->
-    <section class="card col-md-8 col-lg-8">
-        <h2 class="text-headline-md mb-6">Podział parzystych i niskich</h2>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;">
-            <div>
-                <div class="dist-bars">
-                    <div class="dist-bar">
-                        <span class="dist-bar__label">Nieparzyste</span>
-                        <div class="dist-bar__track">
-                            <div class="dist-bar__fill dist-bar__fill--primary" style="width:<?= $oddPct ?>%;"><?= $oddPct ?>%</div>
+        <!-- Cold Numbers (col-span-4) -->
+        <section class="card card--surface-high">
+            <div class="flex items-center gap-3 mb-4">
+                <?= render_material_icon('ac_unit') ?>
+                <h2 class="text-headline-md">Zimne liczby</h2>
+            </div>
+            <div style="display:flex;flex-direction:column;">
+                <?php foreach ($topCold as $c): ?>
+                <div class="cold-item">
+                    <span class="cold-item__ball"><?= str_pad((string)$c['num'], 2, '0', STR_PAD_LEFT) ?></span>
+                    <span class="cold-item__info">Przerwa: <?= h((string)$c['current_gap']) ?> losowań</span>
+                    <?= render_badge('Rzadka', 'rare') ?>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </section>
+
+        <!-- Odd/Even Split (col-span-8) -->
+        <section class="card">
+            <h2 class="text-headline-md mb-6">Podział parzystych i niskich</h2>
+            <div style="display:flex;flex-direction:column;gap:2rem;">
+                <div>
+                    <div class="dist-bars">
+                        <div class="dist-bar">
+                            <span class="dist-bar__label">Nieparzyste</span>
+                            <div class="dist-bar__track">
+                                <div class="dist-bar__fill dist-bar__fill--primary" style="width:<?= $oddPct ?>%;"><?= $oddPct ?>%</div>
+                            </div>
+                        </div>
+                        <div class="dist-bar">
+                            <span class="dist-bar__label">Parzyste</span>
+                            <div class="dist-bar__track">
+                                <div class="dist-bar__fill dist-bar__fill--secondary" style="width:<?= $evenPct ?>%;"><?= $evenPct ?>%</div>
+                            </div>
                         </div>
                     </div>
-                    <div class="dist-bar">
-                        <span class="dist-bar__label">Parzyste</span>
-                        <div class="dist-bar__track">
-                            <div class="dist-bar__fill dist-bar__fill--secondary" style="width:<?= $evenPct ?>%;"><?= $evenPct ?>%</div>
+                </div>
+                <div>
+                    <div class="dist-bars">
+                        <div class="dist-bar">
+                            <span class="dist-bar__label">Wysokie (<?= ($gameDef->lowThreshold + 1) ?>-<?= $poolSize ?>)</span>
+                            <div class="dist-bar__track">
+                                <div class="dist-bar__fill dist-bar__fill--primary" style="width:<?= $highPct ?>%;"><?= $highPct ?>%</div>
+                            </div>
+                        </div>
+                        <div class="dist-bar">
+                            <span class="dist-bar__label">Niskie (1-<?= $gameDef->lowThreshold ?>)</span>
+                            <div class="dist-bar__track">
+                                <div class="dist-bar__fill dist-bar__fill--secondary" style="width:<?= $lowPct ?>%;"><?= $lowPct ?>%</div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-            <div>
-                <div class="dist-bars">
-                    <div class="dist-bar">
-                        <span class="dist-bar__label">Wysokie (<?= ($gameDef->lowThreshold + 1) ?>-<?= $poolSize ?>)</span>
-                        <div class="dist-bar__track">
-                            <div class="dist-bar__fill dist-bar__fill--primary" style="width:<?= $highPct ?>%;"><?= $highPct ?>%</div>
-                        </div>
-                    </div>
-                    <div class="dist-bar">
-                        <span class="dist-bar__label">Niskie (1-<?= $gameDef->lowThreshold ?>)</span>
-                        <div class="dist-bar__track">
-                            <div class="dist-bar__fill dist-bar__fill--secondary" style="width:<?= $lowPct ?>%;"><?= $lowPct ?>%</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
+        </section>
+    </div>
 </div>
 
 <!-- Heatmap Section -->

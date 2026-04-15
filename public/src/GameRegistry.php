@@ -63,7 +63,7 @@ final class GameRegistry
     /** Get all active game slugs. */
     public function allSlugs(): array
     {
-        $rows = $this->pdo->query("SELECT slug FROM games ORDER BY id")->fetchAll(PDO::FETCH_COLUMN);
+        $rows = $this->pdo->query("SELECT slug FROM games ORDER BY slug")->fetchAll(PDO::FETCH_COLUMN);
         return $rows ?: [];
     }
 

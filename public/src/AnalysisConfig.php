@@ -107,7 +107,7 @@ final class AnalysisConfig
     public const DISPLAY_STATS_HOT = 4;
 
     /** Cold numbers shown on the stats page sidebar. */
-    public const DISPLAY_STATS_COLD = 3;
+    public const DISPLAY_STATS_COLD = 4;
 
     // -----------------------------------------------------------------
     // Pagination
