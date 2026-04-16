@@ -11,6 +11,7 @@ require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/src/autoload.php';
 
 $kit = new GameKit($pdo);
+$coRepo = new CoOccurrenceRepository($pdo);
 
 // Validate sync token
 $syncToken  = $envVars['SYNC_TOKEN'] ?? '';
@@ -81,6 +82,14 @@ foreach ($gamesToSync as $slug) {
             }
             if ($kit->repository()->insertDraw($gameDef, $parsed, $kit->calculator(), $kit->describer())) {
                 $inserted++;
+                if ($gameDef->slug === 'multi_multi') {
+                    $coRepo->upsertCoOccurrences(
+                        $gameDef->slug,
+                        $parsed['draw_number'],
+                        $parsed['numbers'],
+                        $parsed['draw_date']
+                    );
+                }
                 if ($parsed['draw_number'] > $lastNum) {
                     $lastNum = $parsed['draw_number'];
                 }

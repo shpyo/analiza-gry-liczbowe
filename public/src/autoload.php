@@ -16,6 +16,7 @@ require_once $srcDir . '/ProfileDescriber.php';
 require_once $srcDir . '/MetricCalculator.php';
 require_once $srcDir . '/MetricTextProvider.php';
 require_once $srcDir . '/DrawRepository.php';
+require_once $srcDir . '/CoOccurrenceRepository.php';
 require_once $srcDir . '/AnalysisConfig.php';
 require_once $srcDir . '/GameRegistry.php';
 require_once $srcDir . '/GameKit.php';

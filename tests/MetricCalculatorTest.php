@@ -72,4 +72,35 @@ final class MetricCalculatorTest extends TestCase
         $this->assertSame(1, $metrics['decades_used']); // all in 0s decade
         $this->assertSame(5, $metrics['consecutive']);   // 5 consecutive pairs
     }
+
+    public function testComputeMetricsMultiMulti20Numbers(): void
+    {
+        $multiMulti = GameDefinitionFactory::multiMulti();
+
+        // 20 numbers spanning all 8 decades of 1–80
+        $numbers = [1, 5, 11, 15, 21, 25, 31, 35, 41, 45, 51, 55, 61, 65, 71, 75, 76, 77, 78, 79];
+        $metrics = $this->calc->computeMetrics($numbers, $multiMulti);
+
+        $this->assertSame(array_sum($numbers), $metrics['sum_total']);
+        // low_count: numbers <= 40 (lowThreshold=40)
+        $this->assertSame(8, $metrics['low_count']); // 1,5,11,15,21,25,31,35
+        // decades_used: 0s(1,5),1s(11,15),2s(21,25),3s(31,35),4s(41,45),5s(51,55),6s(61,65),7s(71,75,76,77,78,79)
+        $this->assertSame(8, $metrics['decades_used']);
+        // range: 79 - 1 = 78
+        $this->assertSame(78, $metrics['range_spread']);
+        // consecutive pairs: 75-76, 76-77, 77-78, 78-79 = 4
+        $this->assertSame(4, $metrics['consecutive']);
+    }
+
+    public function testComputeMetricsMultiMultiLowThreshold(): void
+    {
+        $multiMulti = GameDefinitionFactory::multiMulti();
+
+        // All 20 numbers are low (<= 40)
+        $numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 25, 30, 31, 35, 36, 37, 38, 39, 40];
+        $metrics = $this->calc->computeMetrics($numbers, $multiMulti);
+
+        $this->assertSame(20, $metrics['low_count']);
+        $this->assertSame(0, $metrics['high_count'] ?? $multiMulti->pickCount - $metrics['low_count']);
+    }
 }

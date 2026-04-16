@@ -15,7 +15,8 @@ CREATE TABLE IF NOT EXISTS games (
 INSERT IGNORE INTO games VALUES
   ('lotto','Lotto',6,49,FALSE,24,TRUE,'https://mbnet.com.pl/dl.txt',TRUE),
   ('lotto_plus','Lotto Plus',6,49,TRUE,24,TRUE,'https://mbnet.com.pl/dl_plus.txt',TRUE),
-  ('mini_lotto','Mini Lotto',5,42,FALSE,21,TRUE,'https://mbnet.com.pl/ml.txt',TRUE);
+  ('mini_lotto','Mini Lotto',5,42,FALSE,21,TRUE,'http://www.mbnet.com.pl/el.txt',TRUE),
+  ('multi_multi','Multi Multi',20,80,FALSE,40,TRUE,'http://www.mbnet.com.pl/mm.txt',TRUE);
 
 CREATE TABLE IF NOT EXISTS lotto_draws (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -109,6 +110,61 @@ CREATE TABLE IF NOT EXISTS mini_lotto_draw_profiles (
   pct_of_total DECIMAL(5,2),
   last_seen DATE,
   first_seen DATE
+);
+
+CREATE TABLE IF NOT EXISTS multi_multi_draws (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  draw_date DATE NOT NULL,
+  draw_number INT UNIQUE,
+  n1 TINYINT UNSIGNED, n2 TINYINT UNSIGNED, n3 TINYINT UNSIGNED, n4 TINYINT UNSIGNED,
+  n5 TINYINT UNSIGNED, n6 TINYINT UNSIGNED, n7 TINYINT UNSIGNED, n8 TINYINT UNSIGNED,
+  n9 TINYINT UNSIGNED, n10 TINYINT UNSIGNED, n11 TINYINT UNSIGNED, n12 TINYINT UNSIGNED,
+  n13 TINYINT UNSIGNED, n14 TINYINT UNSIGNED, n15 TINYINT UNSIGNED, n16 TINYINT UNSIGNED,
+  n17 TINYINT UNSIGNED, n18 TINYINT UNSIGNED, n19 TINYINT UNSIGNED, n20 TINYINT UNSIGNED,
+  sum_total SMALLINT,
+  even_count TINYINT,
+  low_count TINYINT,
+  consecutive TINYINT,
+  decades_used TINYINT,
+  range_spread TINYINT,
+  last_digit_unique TINYINT,
+  profile_hash VARCHAR(30),
+  INDEX idx_date (draw_date),
+  INDEX idx_profile (profile_hash)
+);
+
+CREATE TABLE IF NOT EXISTS multi_multi_draw_profiles (
+  profile_hash VARCHAR(30) PRIMARY KEY,
+  even_count TINYINT,
+  low_count TINYINT,
+  sum_bucket CHAR(3),
+  consecutive TINYINT,
+  range_bucket CHAR(3),
+  total_draws INT,
+  pct_of_total DECIMAL(5,2),
+  last_seen DATE,
+  first_seen DATE
+);
+
+CREATE TABLE IF NOT EXISTS multi_multi_pairs (
+  n1 TINYINT UNSIGNED NOT NULL,
+  n2 TINYINT UNSIGNED NOT NULL,
+  count INT NOT NULL DEFAULT 0,
+  last_seen DATE,
+  PRIMARY KEY (n1, n2)
+);
+
+CREATE TABLE IF NOT EXISTS multi_multi_triples (
+  n1 TINYINT UNSIGNED NOT NULL,
+  n2 TINYINT UNSIGNED NOT NULL,
+  n3 TINYINT UNSIGNED NOT NULL,
+  count INT NOT NULL DEFAULT 0,
+  last_seen DATE,
+  PRIMARY KEY (n1, n2, n3)
+);
+
+CREATE TABLE IF NOT EXISTS multi_multi_cooccurrence_log (
+  draw_number INT PRIMARY KEY
 );
 
 CREATE TABLE IF NOT EXISTS sync_log (

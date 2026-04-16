@@ -7,6 +7,8 @@ final class ThresholdBucketStrategyTest extends TestCase
 {
     private ThresholdBucketStrategy $lottoSum;
     private ThresholdBucketStrategy $miniSum;
+    private ThresholdBucketStrategy $multiMultiSum;
+    private ThresholdBucketStrategy $multiMultiRange;
 
     protected function setUp(): void
     {
@@ -24,6 +26,22 @@ final class ThresholdBucketStrategyTest extends TestCase
             ['label' => 'M',  'max' => 120,  'description' => 'średnia (80–120)'],
             ['label' => 'L',  'max' => 159,  'description' => 'duża (121–159)'],
             ['label' => 'XL', 'max' => null, 'description' => 'bardzo duża (160+)'],
+        ]);
+
+        $this->multiMultiSum = new ThresholdBucketStrategy([
+            ['label' => 'XS', 'max' => 675,  'description' => 'bardzo mała (≤675)'],
+            ['label' => 'S',  'max' => 745,  'description' => 'mała (676–745)'],
+            ['label' => 'M',  'max' => 875,  'description' => 'średnia (746–875)'],
+            ['label' => 'L',  'max' => 945,  'description' => 'duża (876–945)'],
+            ['label' => 'XL', 'max' => null, 'description' => 'bardzo duża (946+)'],
+        ]);
+
+        $this->multiMultiRange = new ThresholdBucketStrategy([
+            ['label' => 'XS', 'max' => 62,   'description' => 'bardzo mały (≤62)'],
+            ['label' => 'S',  'max' => 70,   'description' => 'mały (63–70)'],
+            ['label' => 'M',  'max' => 75,   'description' => 'średni (71–75)'],
+            ['label' => 'L',  'max' => 78,   'description' => 'duży (76–78)'],
+            ['label' => 'XL', 'max' => null, 'description' => 'bardzo duży (79+)'],
         ]);
     }
 
@@ -69,5 +87,44 @@ final class ThresholdBucketStrategyTest extends TestCase
         $this->assertCount(5, $boundaries);
         $this->assertSame('XS', $boundaries[0]['label']);
         $this->assertNull($boundaries[4]['max']);
+    }
+
+    public function testClassifyMultiMultiSum(): void
+    {
+        // Boundary: XS <= 675
+        $this->assertSame('XS', $this->multiMultiSum->classify(500));
+        $this->assertSame('XS', $this->multiMultiSum->classify(675));
+        // S: 676–745
+        $this->assertSame('S', $this->multiMultiSum->classify(676));
+        $this->assertSame('S', $this->multiMultiSum->classify(745));
+        // M: 746–875 — example from plan: suma 810 → M
+        $this->assertSame('M', $this->multiMultiSum->classify(746));
+        $this->assertSame('M', $this->multiMultiSum->classify(810));
+        $this->assertSame('M', $this->multiMultiSum->classify(875));
+        // L: 876–945
+        $this->assertSame('L', $this->multiMultiSum->classify(876));
+        $this->assertSame('L', $this->multiMultiSum->classify(945));
+        // XL: >= 946
+        $this->assertSame('XL', $this->multiMultiSum->classify(946));
+        $this->assertSame('XL', $this->multiMultiSum->classify(1200));
+    }
+
+    public function testClassifyMultiMultiRange(): void
+    {
+        // XS <= 62
+        $this->assertSame('XS', $this->multiMultiRange->classify(50));
+        $this->assertSame('XS', $this->multiMultiRange->classify(62));
+        // S: 63–70
+        $this->assertSame('S', $this->multiMultiRange->classify(63));
+        $this->assertSame('S', $this->multiMultiRange->classify(70));
+        // M: 71–75 — example from plan: rozstęp 73 → M
+        $this->assertSame('M', $this->multiMultiRange->classify(71));
+        $this->assertSame('M', $this->multiMultiRange->classify(73));
+        $this->assertSame('M', $this->multiMultiRange->classify(75));
+        // L: 76–78
+        $this->assertSame('L', $this->multiMultiRange->classify(76));
+        $this->assertSame('L', $this->multiMultiRange->classify(78));
+        // XL: >= 79
+        $this->assertSame('XL', $this->multiMultiRange->classify(79));
     }
 }
