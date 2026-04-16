@@ -11,6 +11,14 @@ $poolSize     = $gameDef->poolSize;
 $drawsTable   = $gameDef->drawsTable;
 $profileTable = $gameDef->profileTable;
 
+// For Multi Multi, the player picks 1–10 numbers (not the full 20 drawn numbers).
+$isMultiMulti      = ($gameDef->slug === 'multi_multi');
+$multiMultiMaxPick = 10;
+$playerPickCount   = $pickCount; // default: use full draw count (overridden below for multi_multi)
+if ($isMultiMulti) {
+    $playerPickCount = max(1, min($multiMultiMaxPick, (int)($_POST['player_pick_count'] ?? $_GET['player_pick_count'] ?? 5)));
+}
+
 // -----------------------------------------------------------------------
 // Build number weights from last N draws
 // -----------------------------------------------------------------------
@@ -78,7 +86,7 @@ if ($formPosted) {
         $pool     = $weights;
         $selected = [];
 
-        for ($pick = 0; $pick < $pickCount; $pick++) {
+        for ($pick = 0; $pick < $playerPickCount; $pick++) {
             $totalW = array_sum($pool);
             if ($totalW <= 0) {
                 break;
@@ -95,7 +103,7 @@ if ($formPosted) {
             }
         }
 
-        if (count($selected) !== $pickCount) {
+        if (count($selected) !== $playerPickCount) {
             continue;
         }
 
@@ -186,6 +194,16 @@ $maxFreqHm = max(1, max(array_values($freqRows) ?: [1]));
                         <?php endforeach; ?>
                     </select>
                 </div>
+                <?php if ($isMultiMulti): ?>
+                <div class="form-group" style="min-width:120px;">
+                    <label class="form-label">Liczb w kuponie</label>
+                    <select name="player_pick_count" class="form-select" style="width:auto;">
+                        <?php for ($i = 1; $i <= $multiMultiMaxPick; $i++): ?>
+                            <option value="<?= $i ?>" <?= $playerPickCount === $i ? 'selected' : '' ?>><?= $i ?> liczb</option>
+                        <?php endfor; ?>
+                    </select>
+                </div>
+                <?php endif; ?>
             </div>
 
             <!-- Placeholder / Generated balls -->
@@ -195,7 +213,7 @@ $maxFreqHm = max(1, max(array_values($freqRows) ?: [1]));
                         <?= render_ball($n, 'xl' . (in_array($n, $top10, true) ? ' ball--hot' : '')) ?>
                     <?php endforeach; ?>
                 <?php else: ?>
-                    <?php for ($i = 0; $i < $pickCount; $i++): ?>
+                    <?php for ($i = 0; $i < $playerPickCount; $i++): ?>
                         <span class="ball ball--xl ball--placeholder">?</span>
                     <?php endfor; ?>
                 <?php endif; ?>

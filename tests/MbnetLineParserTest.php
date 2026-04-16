@@ -59,6 +59,42 @@ final class MbnetLineParserTest extends TestCase
         $this->assertNull($parser->parse('1. 01.01.2024 1,2,3,4,5'));
     }
 
+    public function testParseMultiMultiLine(): void
+    {
+        $parser = new MbnetLineParser(20, false);
+
+        $line   = '1. 14.04.2026 1,5,8,12,15,19,23,27,31,35,40,44,48,52,56,60,64,68,72,78';
+        $result = $parser->parse($line);
+
+        $this->assertNotNull($result);
+        $this->assertSame(1, $result['draw_number']);
+        $this->assertSame('2026-04-14', $result['draw_date']);
+        $this->assertCount(20, $result['numbers']);
+        $this->assertSame([1, 5, 8, 12, 15, 19, 23, 27, 31, 35, 40, 44, 48, 52, 56, 60, 64, 68, 72, 78], $result['numbers']);
+        $this->assertNull($result['plus_ball']);
+    }
+
+    public function testParseMultiMultiLineUnsorted(): void
+    {
+        $parser = new MbnetLineParser(20, false);
+
+        // Numbers given unsorted — parser should sort them
+        $line   = '42. 01.01.2025 78,1,64,5,72,8,68,12,60,15,56,19,52,23,48,27,44,31,40,35';
+        $result = $parser->parse($line);
+
+        $this->assertNotNull($result);
+        $this->assertSame(42, $result['draw_number']);
+        $this->assertSame([1, 5, 8, 12, 15, 19, 23, 27, 31, 35, 40, 44, 48, 52, 56, 60, 64, 68, 72, 78], $result['numbers']);
+    }
+
+    public function testParseMultiMultiWrongCount(): void
+    {
+        $parser = new MbnetLineParser(20, false);
+
+        // Only 19 numbers — should return null
+        $this->assertNull($parser->parse('1. 01.01.2024 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19'));
+    }
+
     public function testParseNumbersSorted(): void
     {
         $parser = new MbnetLineParser(6, false);
