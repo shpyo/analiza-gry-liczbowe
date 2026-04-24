@@ -452,10 +452,20 @@ $maxDecadeFreq = max(1, ...array_values($decadeFreq));
 
 <!-- Granular Data Matrix -->
 <div class="card">
-    <div class="flex justify-between items-center mb-6" style="flex-wrap:wrap;gap:1rem;">
-        <div>
-            <h2 class="text-headline-md">Szczegółowa macierz danych</h2>
-            <p class="text-body-sm text-on-surface-variant">Analiza metryki wydajności każdej liczby</p>
+    <div class="mb-6">
+        <h2 class="text-headline-md">Szczegółowa macierz danych</h2>
+        <div style="margin-top:0.75rem;padding:0.75rem 1rem;background:var(--surface-container-low);border-radius:var(--radius-sm);font-size:0.8125rem;line-height:1.7;color:var(--on-surface-variant);">
+            <strong>Jak czytać tabelę:</strong><br>
+            <strong>Trafienia (ogółem)</strong> &mdash; ile razy dana liczba padła we wszystkich losowaniach w historii.<br>
+            <strong>Trafienia (ost. <?= AnalysisConfig::WINDOW_SIZE ?>)</strong> &mdash; ile razy padła w ostatnich <?= AnalysisConfig::WINDOW_SIZE ?> losowaniach. Na tej podstawie wyznaczany jest status.<br>
+            <strong>Status</strong> &mdash;
+            <?= render_badge('Częsta', 'hot') ?> powyżej średniej + 1,5&sigma;,
+            <?= render_badge('Rzadka', 'cold') ?> poniżej średniej &minus; 1,5&sigma;,
+            <?= render_badge('Typowa', 'stable') ?> w normie,
+            <?= render_badge('Nieaktywna', 'rare') ?> brak trafień w oknie.<br>
+            <strong>Przerwa (losowań)</strong> &mdash; ile losowań minęło od ostatniego pojawienia się tej liczby.<br>
+            <strong>Wsk. przerwy</strong> &mdash; aktualna przerwa ÷ średni interwał (1,0 = typowa, &gt;2,0 = dłuższa niż zwykle).<br>
+            Wszystkie dane opisują historię &mdash; nie przewidują przyszłych losowań.
         </div>
     </div>
 
@@ -466,8 +476,6 @@ $maxDecadeFreq = max(1, ...array_values($decadeFreq));
                 <th><a href="<?= h(stats_sort_url('num')) ?>">Liczba<?= sort_arrow('num') ?></a></th>
                 <th><a href="<?= h(stats_sort_url('total_freq')) ?>"><?= $kit->texts()->renderTooltip('total_freq', $gameDef) ?><?= sort_arrow('total_freq') ?></a></th>
                 <th><a href="<?= h(stats_sort_url('window_freq')) ?>"><?= $kit->texts()->renderTooltip('window_freq', $gameDef) ?><?= sort_arrow('window_freq') ?></a></th>
-                <th>Częstość</th>
-                <th>Trend</th>
                 <th>Status</th>
                 <th><a href="<?= h(stats_sort_url('current_gap')) ?>"><?= $kit->texts()->renderTooltip('current_gap', $gameDef) ?><?= sort_arrow('current_gap') ?></a></th>
                 <th><a href="<?= h(stats_sort_url('overdue_score')) ?>"><?= $kit->texts()->renderTooltip('overdue_score', $gameDef) ?><?= sort_arrow('overdue_score') ?></a></th>
@@ -483,35 +491,21 @@ $maxDecadeFreq = max(1, ...array_values($decadeFreq));
 
             if ($isInactive) {
                 $statusBadge = render_badge('Nieaktywna', 'rare');
-                $trendIcon   = '';
             } elseif ($isHot) {
-                $statusBadge = render_badge('Gorąca', 'hot');
-                $trendIcon   = '<span class="material-symbols-outlined text-primary" style="font-size:1.125rem;">trending_up</span>';
+                $statusBadge = render_badge('Częsta', 'hot');
             } elseif ($isCold) {
-                $statusBadge = render_badge('Zimna', 'cold');
-                $trendIcon   = '<span class="material-symbols-outlined text-error" style="font-size:1.125rem;">trending_down</span>';
+                $statusBadge = render_badge('Rzadka', 'cold');
             } else {
-                $statusBadge = render_badge('Stabilna', 'stable');
-                $trendIcon   = '<span class="material-symbols-outlined text-primary" style="font-size:1.125rem;">trending_up</span>';
+                $statusBadge = render_badge('Typowa', 'stable');
             }
 
             // Number ball style
             $ballMod = $isHot ? 'sm ball--hot' : 'sm';
-
-            // Frequency bar width
-            $freqPct = $maxFreq > 0 ? round($row['window_freq'] / $maxFreq * 100) : 0;
-            $freqBarColor = $isHot ? 'var(--tertiary)' : 'var(--secondary-container)';
             ?>
             <tr>
                 <td><?= render_ball($row['num'], $ballMod) ?></td>
                 <td><strong><?= h((string)$row['total_freq']) ?></strong></td>
                 <td><?= h((string)$row['window_freq']) ?></td>
-                <td style="min-width:8rem;">
-                    <div class="progress-bar" style="height:0.375rem;">
-                        <div class="progress-bar__fill" style="width:<?= $freqPct ?>%;background:<?= $freqBarColor ?>;"></div>
-                    </div>
-                </td>
-                <td><?= $trendIcon ?></td>
                 <td><?= $statusBadge ?></td>
                 <td><?= h((string)$row['current_gap']) ?></td>
                 <td<?= $row['overdue_score'] > AnalysisConfig::OVERDUE_CRITICAL ? ' style="color:var(--outline);font-weight:600;"' : ($row['overdue_score'] > AnalysisConfig::OVERDUE_WARNING ? ' style="color:var(--outline);"' : '') ?> title="Stosunek przerwy do średniego interwału. Wysoka wartość NIE oznacza zwiększonego prawdopodobieństwa wylosowania."><?= h((string)$row['overdue_score']) ?></td>

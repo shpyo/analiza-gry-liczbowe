@@ -14,11 +14,11 @@ final class MetricTextProvider
         'range_spread'       => 'Rozstęp',
         'last_digit_unique'  => 'Unikalne cyfry jedności',
         'profile_hash'       => 'Profil strukturalny',
-        'overdue_score'      => 'Wskaźnik przerwy',
-        'current_gap'        => 'Przerwa',
+        'overdue_score'      => 'Wsk. przerwy',
+        'current_gap'        => 'Przerwa (losowań)',
         'avg_interval'       => 'Śr. co ile losowań',
-        'window_freq'        => 'Ost. 500 losowań',
-        'total_freq'         => 'Łącznie',
+        'window_freq'        => 'Trafienia (ost. 500)',
+        'total_freq'         => 'Trafienia (ogółem)',
     ];
 
     public function label(string $key): string
