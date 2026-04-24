@@ -822,7 +822,9 @@ Plik: `public/generator.php`
 │    ├─ last_digit   ≤ lastDigMax?                             │
 │    ├─ hot_count    ≥ hotMin? (ile z top-10 gorących)         │
 │    ├─ decades_max  max z jednej dziesiątki ≤ limit?          │
-│    └─ profile_hash ∈ wantedHashes? (jeśli wybrano)           │
+│    ├─ decades_min  liczba różnych dziesiątek ≥ limit?        │
+│    └─ profile_hash ∈ wantedHashes? (jeśli wybrano, tylko     │
+│                    dla gier o stałej liczbie liczb)          │
 │                                                              │
 │    Którykolwiek NIE → odrzuć, wróć do kroku 2                │
 │    Wszystkie TAK → dodaj do wyników                          │
@@ -899,3 +901,88 @@ P(49) =  1 / Σ(weights) ≈  1/3000 ≈ 0.03%
 │              OK?──► kupon zaakceptowany                  │
 └──────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## 8. Multi Multi — filtry dla zakładów o zmiennej liczbie liczb
+
+Multi Multi (20/80) pozwala graczowi wybrać **2–10 własnych liczb** z puli 80.
+To fundamentalnie różni się od gier o stałym `pickCount`.
+
+### Problem profilu strukturalnego (hash)
+
+Profile w tabeli `multi_multi_draw_profiles` opisują pełne losowania 20 liczb:
+- sumy: 700–1000
+- parzyste: ~10/20
+- dziesiątki: ~2–3 z każdej grupy
+
+Zakład gracza (np. 6 liczb) żyje w zupełnie innej przestrzeni:
+- sumy: 21–480
+- parzyste: 0–6
+- dziesiątki: inne rozłożenie
+
+**Dlatego selektor profilu jest ukryty dla Multi Multi** — porównanie byłoby bezsensowne.
+
+### Metryki użyteczne dla dowolnego betPickCount
+
+Metryki `even_count`, `low_count`, `consecutive`, `decades_used`, `last_digit_unique`
+są użyteczne niezależnie od `betPickCount`, o ile zakresy dopasowuje się proporcjonalnie.
+
+#### Rozkład historyczny Multi Multi (losowania 20/80)
+
+```
+Parzyste:      ~10/20 = 50%   (pula: 40 par. / 40 niepar.)
+Niskie (1–40): ~10/20 = 50%   (pula: 40 niskie / 40 wysokie)
+Dziesiątek:    8 grup × ~2.5 liczby (grupy 1–10, 11–20, ..., 71–80)
+Sąsiedzi:      ~4–6 par consecutive na losowanie
+```
+
+#### Proporcjonalne zakresy filtrów
+
+Dla zakładu k liczb, zbalansowane filtry to proporcja 50% ±1 oraz
+maksimum z jednej dziesiątki = ⌈k/5⌉ (bo 8 dziesiątek, a ~k/8 ≈ k/10):
+
+| k (betPickCount) | even min–max | low min–max | decades_max (z jednej) | decades_min (różnych) |
+|---|---|---|---|---|
+| 2 | 0–2 | 0–2 | 1 | 1 |
+| 4 | 1–3 | 1–3 | 1 | 2 |
+| 6 | 2–4 | 2–4 | 2 | 3 |
+| 8 | 3–5 | 3–5 | 2 | 4 |
+| 10 | 4–6 | 4–6 | 2 | 5 |
+
+**Wzory ogólne:**
+
+```
+even_min = floor(k/2) - 1    even_max = ceil(k/2) + 1
+low_min  = floor(k/2) - 1    low_max  = ceil(k/2) + 1
+
+decades_max  = max(1, ceil(k / 5))
+               (max liczb z jednej dziesiątki — "skupienie")
+
+decades_min  = max(1, ceil(k / 2))
+               (minimalna liczba różnych dziesiątek — "rozproszenie")
+```
+
+#### Semantyczna różnica: decades_max vs decades_min
+
+```
+Kupons:  [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]   (k=10, cały z grupy 1–10)
+  decades_used = 1   ← nie spełnia decades_min ≥ 5  → ODRZUCONY
+
+Kupon:   [5, 15, 25, 35, 45, 55, 65, 75, 8, 18]  (k=10, 8 różnych grup)
+  decades_used = 8   ← spełnia decades_min ≥ 5  → OK
+  max z jednej = 2   ← spełnia decades_max ≤ 2  → OK
+
+Kupon:   [1, 11, 21, 31, 41, 51, 61, 71, 2, 12]  (k=10, 8 grup, maks 2)
+  → Idealnie zbalansowany według obu kryteriów
+```
+
+### Dlaczego suma jest nieużyteczna dla zmiennego betPickCount
+
+Sumy pełnych losowań (20 liczb) mają rozkład ok. 750–950.
+Sumy kuponu gracza (np. 6 liczb) mogą być 21–480.
+Buckety sumy (`XS/S/M/L/XL`) są kalibrowane dla 20-liczbowych losowań.
+Porównanie kuponu 6-liczbowego do tych bucketów zawsze da bucket `XS`.
+
+**Wniosek:** Dla Multi Multi używaj filtrów `even_min/max`, `low_min/max`,
+`consecutive`, `decades_min`, `decades_max`, `hot_min`. Pomijaj `sum` i `profile_hash`.

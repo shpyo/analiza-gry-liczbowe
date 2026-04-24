@@ -3,19 +3,21 @@ declare(strict_types=1);
 
 final class GameKit
 {
-    private readonly GameRegistry      $registry;
-    private readonly MetricCalculator  $calculator;
-    private readonly ProfileDescriber  $describer;
+    private readonly GameRegistry       $registry;
+    private readonly MetricCalculator   $calculator;
+    private readonly ProfileDescriber   $describer;
     private readonly MetricTextProvider $texts;
-    private readonly DrawRepository    $repository;
+    private readonly DrawRepository     $repository;
+    private readonly CoOccurrenceRepository $coOccurrenceRepo;
 
     public function __construct(PDO $pdo)
     {
-        $this->registry   = new GameRegistry($pdo);
-        $this->calculator = new MetricCalculator();
-        $this->describer  = new ProfileDescriber();
-        $this->texts      = new MetricTextProvider();
-        $this->repository = new DrawRepository($pdo);
+        $this->registry         = new GameRegistry($pdo);
+        $this->calculator       = new MetricCalculator();
+        $this->describer        = new ProfileDescriber();
+        $this->texts            = new MetricTextProvider();
+        $this->repository       = new DrawRepository($pdo);
+        $this->coOccurrenceRepo = new CoOccurrenceRepository($pdo);
     }
 
     /** Get a GameDefinition by slug. */
@@ -58,5 +60,10 @@ final class GameKit
     public function registry(): GameRegistry
     {
         return $this->registry;
+    }
+
+    public function coOccurrence(): CoOccurrenceRepository
+    {
+        return $this->coOccurrenceRepo;
     }
 }

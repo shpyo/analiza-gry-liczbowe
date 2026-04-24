@@ -52,6 +52,7 @@ final class MetricCalculator
             'decades_used'      => count($decades),
             'range_spread'      => $numbers[count($numbers) - 1] - $numbers[0],
             'last_digit_unique' => count($lastDigits),
+            'pick_count'        => count($numbers),
         ];
     }
 

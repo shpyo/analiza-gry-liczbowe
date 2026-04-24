@@ -18,6 +18,7 @@ z wyjaśnieniem **po co**, **dlaczego taka wartość** i **przykładami**.
 9. [Generator — wagi i limity](#9-generator--wagi-i-limity)
 10. [Heatmapa generatora — progi kolorów](#10-heatmapa-generatora--progi-kolorów)
 11. [Paginacja i UI](#11-paginacja-i-ui)
+12. [Multi Multi — filtry dla zmiennego betPickCount](#12-multi-multi--filtry-dla-zakładów-o-zmiennej-liczbie-liczb)
 
 ---
 
@@ -25,12 +26,14 @@ z wyjaśnieniem **po co**, **dlaczego taka wartość** i **przykładami**.
 
 Źródło: tabela `games` w DB + `GameRegistry.php`
 
-| Parametr | Lotto | Lotto Plus | Mini Lotto | Po co? |
-|---|---|---|---|---|
-| `pickCount` | 6 | 6 | 5 | Ile liczb w jednym losowaniu |
-| `poolSize` | 49 | 49 | 42 | Z jakiej puli się losuje (1–N) |
-| `lowThreshold` | 24 | 24 | 21 | Próg podziału niskie/wysokie |
-| `hasBonus` | nie | tak | nie | Czy jest dodatkowa kula (plus_ball) |
+| Parametr | Lotto | Lotto Plus | Mini Lotto | Multi Multi | Po co? |
+|---|---|---|---|---|---|
+| `pickCount` | 6 | 6 | 5 | 20 | Ile liczb w jednym losowaniu |
+| `poolSize` | 49 | 49 | 42 | 80 | Z jakiej puli się losuje (1–N) |
+| `lowThreshold` | 24 | 24 | 21 | 40 | Próg podziału niskie/wysokie |
+| `hasBonus` | nie | tak | nie | nie | Czy jest dodatkowa kula (plus_ball) |
+| `betPickMin` | — | — | — | 1 | Min liczb w zakładzie gracza (MM: można grać 1–10 z 20) |
+| `betPickMax` | — | — | — | 10 | Max liczb w zakładzie gracza |
 
 ### lowThreshold — dlaczego 24 i 21?
 
@@ -365,9 +368,26 @@ Stałe progi byłyby ABSOLUTNE:
 | Stała | Wartość | Po co? |
 |---|---|---|
 | Formuła wagi | `window_freq + 1` | Prawdopodobieństwo wylosowania proporcjonalne do częstości |
-| Max prób | **50 000** | Limit iteracji generowania z filtrami |
+| Max prób | **100 000** | Limit iteracji generowania z filtrami |
 | Max kuponów | **20** | Max liczba kuponów na jedno generowanie |
 | Top-N gorących | **10** | Ile najczęstszych liczb tworzy "top gorących" |
+
+### Filtry generatora — kompletna lista
+
+| Filtr | Parametr | Zakres | Działanie |
+|---|---|---|---|
+| Suma min/max | `sum_min`, `sum_max` | 0 – poolSize×k | Odrzuć jeśli suma poza zakresem |
+| Parzyste min/max | `even_min`, `even_max` | 0 – k | Odrzuć jeśli even_count poza zakresem |
+| Niskie min/max | `low_min`, `low_max` | 0 – k | Odrzuć jeśli low_count poza zakresem |
+| Max par sąsiadów | `consec_max` | 0 – k-1 | Odrzuć jeśli consecutive > limit |
+| Max cyfr jedności | `last_digit_max` | 1 – k | Odrzuć jeśli last_digit_unique > limit |
+| Min gorących | `hot_min` | 0 – k | Odrzuć jeśli mniej niż N z top-10 |
+| Max z dziesiątki | `decades_max` | 1 – k | Odrzuć jeśli jakaś dziesiątka ma > N liczb z kuponu |
+| Min różnych dziesiątek | `decades_min` | 1 – ceil(poolSize/10) | Odrzuć jeśli kupon kryje < N różnych dziesiątek |
+| Profil strukturalny | `profile_hashes[]` | wybór z listy | Tylko dla gier o stałym pickCount |
+
+**Uwaga dla Multi Multi:** Filtry `sum` i `profile_hash` są nieużyteczne
+dla zakładów o zmiennym `betPickCount` — patrz sekcja 12.
 
 ### Formuła wagi: `freq + 1`
 
@@ -387,10 +407,10 @@ Dlaczego + 1?
   → Ale nieobecna wciąż może wypaść
 ```
 
-### Max prób: 50 000
+### Max prób: 100 000
 
 ```
-Dlaczego 50 000?
+Dlaczego 100 000?
 
   Bez filtrów: generowanie 1 kuponu = 1 próba
   Z agresywnymi filtrami: może potrzeba 1000+ prób na 1 kupon
@@ -400,9 +420,9 @@ Dlaczego 50 000?
     Średnie filtry:   ~50–200 prób/kupon → 20 kuponów w ~4000 prób
     Agresywne filtry: ~5000+ prób/kupon → może nie zebrać 20
 
-  50 000 = wystarczająco na rozsądne filtry
-           przy max 20 kuponach → 2500 prób/kupon budżet
-           czas wykonania: <100ms na typowym serwerze
+  100 000 = wystarczająco na rozsądne filtry
+            przy max 20 kuponach → 5000 prób/kupon budżet
+            czas wykonania: ~100–200ms na typowym serwerze
 ```
 
 ### Top-10 gorących
@@ -468,6 +488,75 @@ od progów temperatury w stats.php, które oparte są na σ).
 
 ---
 
+## 12. Multi Multi — filtry dla zakładów o zmiennej liczbie liczb
+
+Multi Multi umożliwia graczowi wybór **1–10 własnych liczb** z puli 80,
+natomiast losowanie wyciąga zawsze **20 z 80**.
+
+### Dlaczego suma i profile są nieużyteczne
+
+Tabele `multi_multi_draw_profiles` zawierają profile pełnych losowań (20 liczb).
+Zakład gracza (np. 6 liczb) ma inną przestrzeń sum i parzystych.
+Porównanie hashów kuponów z hashami z bazy zawsze kończy się brakiem dopasowania.
+
+Filtr profilu jest dlatego **ukryty w UI** dla Multi Multi.
+
+### Metryki użyteczne — z proporcjonalnymi zakresami
+
+Każda metryka poniżej działa dla dowolnego `k = betPickCount`,
+o ile zakresy uwzględniają że losowanie 20/80 ma rozkład 50/50:
+
+| Metryka | Proporcjonalny zakres dla k liczb |
+|---|---|
+| `even_count` | `[floor(k/2)-1, ceil(k/2)+1]` |
+| `low_count` | `[floor(k/2)-1, ceil(k/2)+1]` |
+| `consecutive` | `[0, floor(k/3)]` (unikanie skupień) |
+| `decades_max` | `max(1, ceil(k/5))` — max liczb z jednej dziesiątki |
+| `decades_min` | `max(1, ceil(k/2))` — min różnych dziesiątek |
+| `hot_min` | zależnie od preferencji |
+
+### Tabela proporcjonalnych wartości
+
+```
+k=2:   even 0–2 | low 0–2 | consec ≤1 | dec_max 1 | dec_min 1
+k=4:   even 1–3 | low 1–3 | consec ≤1 | dec_max 1 | dec_min 2
+k=6:   even 2–4 | low 2–4 | consec ≤2 | dec_max 2 | dec_min 3
+k=8:   even 3–5 | low 3–5 | consec ≤2 | dec_max 2 | dec_min 4
+k=10:  even 4–6 | low 4–6 | consec ≤3 | dec_max 2 | dec_min 5
+```
+
+### Dlaczego `decades_max ≤ 2` dla k=10?
+
+```
+8 dziesiątek (1–10, 11–20, ..., 71–80)
+Wybierasz 10 liczb → oczekiwana gęstość: 10/8 = 1.25 na dziesiątkę
+
+decades_max = 2  →  żadna dziesiątka nie ma > 2 liczb z kuponu
+                →  dobre rozproszenie po puli 1–80
+
+decades_max = 5  →  połowa kuponu (5 z 10) może być z 11–20
+                →  skupienie = mało prawdopodobne wzorzec historycznie
+
+Dla k=10: dec_max=2 to "zbalansowane", nie dec_max=k/2=5.
+```
+
+### Semantic: dwie metryki dziesiątek
+
+```
+decades_max  = max z jednej dziesiątki  →  bada SKUPIENIE
+decades_min  = liczba różnych dziesiątek →  bada ROZPROSZENIE
+
+Dla pełnego kuponu 10-liczbowego, idealny przypadek:
+  10 liczb × 8 dziesiątek = brak możliwości pokrycia wszystkich 8
+  realnie: 5–7 różnych dziesiątek
+
+Kupon [1..10]:  decades_max=10, decades_min=1  → skupiony, odrzucony
+Kupon [5,15,25,35,45,55,65,75,8,18]:
+               decades_max=2,  decades_min=8  → rozproszony, OK
+```
+
+---
+
 ## Podsumowanie — co zmienić dodając nową grę
 
 Przy dodawaniu nowej gry (np. Ekstra Pensja 5/35):
@@ -477,9 +566,12 @@ Przy dodawaniu nowej gry (np. Ekstra Pensja 5/35):
 | `pickCount`, `poolSize`, `lowThreshold` | DB: tabela `games` | Tak — INSERT |
 | Sum bucket boundaries | `GameRegistry.php` | Trzeba dodać* |
 | Range bucket boundaries | `GameRegistry.php` | Trzeba dodać* |
+| `betPickMin`, `betPickMax` (jeśli variable) | `GameRegistry.php::get()` | Trzeba dodać |
 | Progi temperatury (σ) | `stats.php` | **Automatyczne** (wyliczane z p) |
 | Progi zaległości | `stats.php` | **Automatyczne** (1.0 / 2.0 to stałe) |
 | Heatmapa kwintylowa | `stats.php` | **Automatyczne** (kwintyle) |
 | Wagi generatora | `generator.php` | **Automatyczne** (freq+1) |
+| Filtry form z betPickCount | `generator.php` | **Automatyczne** (clamping do k) |
+| Selektor profilu | `generator.php` | Automatycznie ukryty dla variable-bet |
 
 *\*Bucket boundaries trzeba wyliczyć raz na podstawie μ i σ rozkładu sumy/rozstępu nowej gry.*

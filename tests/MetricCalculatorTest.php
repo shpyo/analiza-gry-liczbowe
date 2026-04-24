@@ -72,4 +72,25 @@ final class MetricCalculatorTest extends TestCase
         $this->assertSame(1, $metrics['decades_used']); // all in 0s decade
         $this->assertSame(5, $metrics['consecutive']);   // 5 consecutive pairs
     }
+
+    public function testComputeMetricsMultiMulti(): void
+    {
+        $multiMulti = GameDefinitionFactory::multiMulti();
+        // Typical draw: 20 numbers from 1–80
+        $numbers = [2, 7, 11, 15, 20, 24, 29, 33, 38, 40, 41, 46, 51, 55, 59, 63, 67, 72, 75, 79];
+
+        $metrics = $this->calc->computeMetrics($numbers, $multiMulti);
+
+        $this->assertSame(array_sum($numbers), $metrics['sum_total']);
+        // even: 2, 20, 24, 38, 40, 46, 72 = 7
+        $this->assertSame(7, $metrics['even_count']);
+        // low (≤40): 2,7,11,15,20,24,29,33,38,40 = 10
+        $this->assertSame(10, $metrics['low_count']);
+        // range: 79 - 2 = 77
+        $this->assertSame(77, $metrics['range_spread']);
+        // 8 decades (0-7, all eight groups represented)
+        $this->assertSame(8, $metrics['decades_used']);
+        // consecutive pairs: 40-41 only = 1
+        $this->assertSame(1, $metrics['consecutive']);
+    }
 }

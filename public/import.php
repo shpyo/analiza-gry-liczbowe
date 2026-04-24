@@ -100,6 +100,16 @@ foreach ($gamesToProcess as $slug) {
 
     $kit->repository()->rebuildProfiles($gameDef, $kit->describer());
 
+    if ($gameDef->coOccurrence && $inserted > 0) {
+        if ($isCli) {
+            echo "Rebuilding co-occurrence tables...\n";
+        }
+        $kit->coOccurrence()->rebuildFromDraws($gameDef);
+        if ($isCli) {
+            echo "Co-occurrence tables rebuilt.\n";
+        }
+    }
+
     $summary = "Wstawiono: {$inserted}, Już istniało: {$skipped}, Błędy parsowania: {$errors}";
     if ($isCli) {
         echo $summary . "\n";

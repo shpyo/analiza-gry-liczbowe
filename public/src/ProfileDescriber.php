@@ -10,9 +10,10 @@ final class ProfileDescriber
     public function computeHash(array $metrics, GameDefinition $game): string
     {
         $even = (int)$metrics['even_count'];
-        $odd  = $game->pickCount - $even;
+        $n    = (int)($metrics['pick_count'] ?? $game->pickCount);
+        $odd  = $n - $even;
         $low  = (int)$metrics['low_count'];
-        $high = $game->pickCount - $low;
+        $high = $n - $low;
         $sB   = $game->sumBuckets->classify((int)$metrics['sum_total']);
         $rB   = $game->rangeBuckets->classify((int)$metrics['range_spread']);
         $c    = (int)$metrics['consecutive'];

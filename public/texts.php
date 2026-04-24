@@ -175,21 +175,23 @@ function range_bucket_label(string $bucket, string $game = 'lotto'): string
 // ---------------------------------------------------------------------------
 
 const NAV_LABELS = [
-    'dashboard' => 'Dashboard',
-    'draws'     => 'Losowania',
-    'stats'     => 'Statystyki',
-    'generator' => 'Generator',
-    'validator' => 'Weryfikator',
-    'sync'      => 'Synchronizuj',
-    'import'    => 'Wczytaj historię',
+    'dashboard'    => 'Dashboard',
+    'draws'        => 'Losowania',
+    'stats'        => 'Statystyki',
+    'generator'    => 'Generator',
+    'validator'    => 'Weryfikator',
+    'cooccurrence' => 'Współwystępowanie',
+    'sync'         => 'Synchronizuj',
+    'import'       => 'Wczytaj historię',
 ];
 
 const NAV_ICONS = [
-    'dashboard' => 'dashboard',
-    'draws'     => 'event_note',
-    'stats'     => 'analytics',
-    'generator' => 'casino',
-    'validator' => 'task_alt',
-    'sync'      => 'sync',
-    'import'    => 'download',
+    'dashboard'    => 'dashboard',
+    'draws'        => 'event_note',
+    'stats'        => 'analytics',
+    'generator'    => 'casino',
+    'validator'    => 'task_alt',
+    'cooccurrence' => 'hub',
+    'sync'         => 'sync',
+    'import'       => 'download',
 ];

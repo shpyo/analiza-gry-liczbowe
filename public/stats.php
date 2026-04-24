@@ -209,6 +209,24 @@ function _heatmap_bucket(int $freq, array $q): int {
     return count($q);
 }
 
+/**
+ * Aggregate a number→frequency map into decade buckets (1-indexed: decade 1 = 1–10, etc.).
+ * Works for any pool size; the last bucket may be smaller than 10.
+ *
+ * @param  array<int,int> $freqMap  number → frequency
+ * @param  int            $poolSize largest number in pool
+ * @return array<int,int>           decade index → total frequency
+ */
+function _decade_freq(array $freqMap, int $poolSize): array
+{
+    $count  = (int)ceil($poolSize / 10);
+    $result = array_fill(1, $count, 0);
+    for ($n = 1; $n <= $poolSize; $n++) {
+        $result[(int)ceil($n / 10)] += $freqMap[$n] ?? 0;
+    }
+    return $result;
+}
+
 // Compute overall odd/even/low/high from last N draws
 $evenTotal = 0;
 $lowTotal  = 0;
@@ -229,6 +247,11 @@ $highPct = 100 - $lowPct;
 
 // Probability index for hot numbers
 $probIndex = $maxFreq > 0 ? round($topHot[0]['window_freq'] / ($windowLimit * $pickCount / $poolSize) * 100, 1) : 0;
+
+// Decade frequency distribution (aggregated from $windowFreqMap, no extra SQL needed)
+$decadeFreq    = _decade_freq($windowFreqMap, $poolSize);
+$decadeCount   = count($decadeFreq);
+$maxDecadeFreq = max(1, ...array_values($decadeFreq));
 ?>
 
 <!-- Page Header -->
@@ -371,8 +394,10 @@ $probIndex = $maxFreq > 0 ? round($topHot[0]['window_freq'] / ($windowLimit * $p
     </div>
 </div>
 
+<div style="display:flex;gap:1.5rem;margin-bottom:2rem;align-items:flex-start;flex-wrap:wrap;">
+
 <!-- Heatmap Section -->
-<div class="card mb-8">
+<div class="card" style="flex:2;min-width:20rem;">
     <h2 class="text-headline-md mb-4">Heatmapa częstości &mdash; ostatnie 500 losowań</h2>
     <div class="hm-grid" style="margin-bottom:1rem;">
         <?php for ($n = 1; $n <= $poolSize; $n++):
@@ -397,6 +422,32 @@ $probIndex = $maxFreq > 0 ? round($topHot[0]['window_freq'] / ($windowLimit * $p
         <?php endfor; ?>
     </div>
 </div>
+
+<!-- Decade Distribution Chart -->
+<div class="card" style="flex:1;min-width:16rem;">
+    <div class="mb-4">
+        <h2 class="text-headline-md">Rozkład dziesiątek</h2>
+        <p class="text-body-sm text-on-surface-variant">Suma trafień per przedział &mdash; ostatnie <?= AnalysisConfig::WINDOW_SIZE ?> losowań</p>
+    </div>
+    <div class="dist-bars">
+        <?php for ($d = 1; $d <= $decadeCount; $d++):
+            $lo   = ($d - 1) * 10 + 1;
+            $hi   = min($d * 10, $poolSize);
+            $freq = $decadeFreq[$d];
+            $pct  = $maxDecadeFreq > 0 ? round($freq / $maxDecadeFreq * 100) : 0;
+            $fillClass = $pct >= 80 ? 'dist-bar__fill--primary' : 'dist-bar__fill--secondary';
+        ?>
+        <div class="dist-bar">
+            <span class="dist-bar__label"><?= $lo ?>–<?= $hi ?></span>
+            <div class="dist-bar__track">
+                <div class="dist-bar__fill <?= $fillClass ?>" style="width:<?= max(4, $pct) ?>%;"><?= $freq ?></div>
+            </div>
+        </div>
+        <?php endfor; ?>
+    </div>
+</div>
+
+</div><!-- /flex heatmap+decades row -->
 
 <!-- Granular Data Matrix -->
 <div class="card">

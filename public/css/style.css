@@ -744,6 +744,15 @@ img { max-width: 100%; display: block; }
   transition: all 0.3s;
   width: 100%;
 }
+.form-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='%23727785'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.625rem center;
+  padding-right: 2.25rem;
+  cursor: pointer;
+}
 .form-input:focus,
 .form-select:focus {
   outline: none;
@@ -1047,6 +1056,13 @@ img { max-width: 100%; display: block; }
   padding-top: 2rem;
   margin-top: 2rem;
   border-top: 1px solid var(--surface-container);
+}
+
+/* --- Filter divider --- */
+.filter-divider {
+  border: none;
+  border-top: 1px solid var(--outline-variant);
+  margin: 1.25rem 0;
 }
 
 /* --- Details/Summary (collapsible) --- */

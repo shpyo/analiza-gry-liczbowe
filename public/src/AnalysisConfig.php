@@ -42,7 +42,7 @@ final class AnalysisConfig
     // -----------------------------------------------------------------
 
     /** Maximum iterations before giving up on filter-constrained generation. */
-    public const GENERATOR_MAX_ATTEMPTS = 50_000;
+    public const GENERATOR_MAX_ATTEMPTS = 100_000;
 
     /** Maximum coupons per single generation request. */
     public const GENERATOR_MAX_COUPONS = 20;

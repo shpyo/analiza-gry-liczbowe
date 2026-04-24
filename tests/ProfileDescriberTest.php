@@ -71,4 +71,30 @@ final class ProfileDescriberTest extends TestCase
         $this->assertStringContainsString('2 parzyste', $desc);
         $this->assertStringContainsString('brak par sąsiadów', $desc);
     }
+
+    public function testHashAndDescribeMultiMulti(): void
+    {
+        $multiMulti = GameDefinitionFactory::multiMulti();
+        // Typical multi_multi metrics: 10 even, 10 low, sum=810 (M), 7 consecutive, range=75 (M)
+        $metrics = [
+            'sum_total'         => 810,
+            'even_count'        => 10,
+            'low_count'         => 10,
+            'consecutive'       => 7,
+            'decades_used'      => 8,
+            'range_spread'      => 75,
+            'last_digit_unique' => 10,
+        ];
+
+        $hash = $this->describer->computeHash($metrics, $multiMulti);
+
+        // 10e10o_10l10h_sM_c7_rM
+        $this->assertSame('10e10o_10l10h_sM_c7_rM', $hash);
+
+        $desc = $this->describer->describe($hash, $multiMulti);
+        $this->assertStringContainsString('10 parzyste', $desc);
+        $this->assertStringContainsString('10 niskie', $desc);
+        $this->assertStringContainsString('suma', $desc);
+        $this->assertStringContainsString('7 pary sąsiadów', $desc);
+    }
 }

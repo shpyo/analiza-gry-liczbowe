@@ -84,6 +84,9 @@ foreach ($gamesToSync as $slug) {
                 if ($parsed['draw_number'] > $lastNum) {
                     $lastNum = $parsed['draw_number'];
                 }
+                if ($gameDef->coOccurrence) {
+                    $kit->coOccurrence()->processNewDraw($gameDef, $parsed['numbers'], $parsed['draw_date']);
+                }
             }
         }
 
