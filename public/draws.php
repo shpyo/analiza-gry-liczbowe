@@ -120,6 +120,7 @@ function draws_url(array $overrides = []): string
 <?php else: ?>
 
 <div class="card">
+    <div class="table-scroll">
     <table class="data-table">
         <thead>
             <tr>
@@ -164,6 +165,7 @@ function draws_url(array $overrides = []): string
         <?php endforeach; ?>
         </tbody>
     </table>
+    </div>
 </div>
 
 <?php if ($totalPages > 1): ?>

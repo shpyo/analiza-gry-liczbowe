@@ -246,7 +246,7 @@ final class MetricTextProvider
     {
         $label   = $this->label($metric);
         $tip     = $this->tooltip($metric, $game);
-        return '<span class="tooltip-trigger" title="' . htmlspecialchars($tip, ENT_QUOTES, 'UTF-8') . '">'
+        return '<span class="tooltip-trigger" data-tip="' . htmlspecialchars($tip, ENT_QUOTES, 'UTF-8') . '">'
              . htmlspecialchars($label, ENT_QUOTES, 'UTF-8')
              . ' <span class="tooltip-icon">?</span></span>';
     }

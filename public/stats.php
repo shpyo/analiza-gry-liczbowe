@@ -459,6 +459,7 @@ $maxDecadeFreq = max(1, ...array_values($decadeFreq));
         </div>
     </div>
 
+    <div class="table-scroll">
     <table class="data-table">
         <thead>
             <tr>
@@ -518,6 +519,7 @@ $maxDecadeFreq = max(1, ...array_values($decadeFreq));
         <?php endforeach; ?>
         </tbody>
     </table>
+    </div>
     <p class="text-body-sm text-on-surface-variant" style="margin-top:1rem;font-style:italic;">
         Wszystkie metryki mają charakter deskryptywny (opisują historię). Loteria nie ma pamięci &mdash; historyczna częstość ani przerwa nie wpływają na prawdopodobieństwo przyszłych losowań. Każda liczba ma takie samo szanse w każdym losowaniu.
     </p>
