@@ -56,9 +56,10 @@ $triplesBaseUrl = cooc_url($game, 'triples', ['pairs_min'   => $pairsMinCount,  
             <span class="text-label-md text-primary mb-2" style="display:block;">ANALIZA KOMBINACJI</span>
             <h1 class="page-header__title">Współwystępowanie — <?= h($gameDef->name) ?></h1>
             <p class="page-header__desc">
-                Pary i trójki liczb pojawiające się razem częściej lub rzadziej niż wskazuje losowość.
+                Pary i trójki liczb pojawiające się razem częściej lub rzadziej niż przewiduje model losowy.
                 Lift &gt; 1 = nadreprezentacja, lift &lt; 1 = niedobór.
                 Analiza oparta na <?= h((string)$totalDraws) ?> losowaniach.
+                Lift bliski 1,0 (np. 0,9&ndash;1,1) jest prawdopodobnie wynikiem naturalnego szumu losowego, nie realnej zależności.
             </p>
         </div>
     </div>
@@ -231,6 +232,18 @@ $triplesBaseUrl = cooc_url($game, 'triples', ['pairs_min'   => $pairsMinCount,  
 </section>
 
 <?php endif; ?>
+
+<!-- INFO CARD: statistical significance -->
+<section class="card card--tonal" style="grid-column: 1 / -1;">
+    <h3 class="text-headline-sm mb-2">Jak interpretować lift?</h3>
+    <p class="text-body-sm text-on-surface-variant" style="line-height:1.7;">
+        Lift mierzy stosunek obserwowanej częstości do oczekiwanej przy założeniu losowości.
+        Wartości <strong>0,9&ndash;1,1</strong> mieszczą się w zakresie normalnych wahań losowych i nie powinny być interpretowane jako wzorzec.
+        Dopiero lift <strong>&gt; 1,2</strong> lub <strong>&lt; 0,8</strong> może wskazywać na ciekawą zależność, choć nawet te odchylenia mogą być dziełem przypadku.
+        Przy <?= h((string)$totalDraws) ?> losowaniach i tysiącach par, <strong>niektóre</strong> odchylenia wystąpią czysto losowo (problem wielokrotnych porównań).
+        Ta analiza ma charakter eksploracyjny &mdash; nie stanowi dowodu na nielosowość gry.
+    </p>
+</section>
 
 <!-- INFO CARD: why no 4-tuples -->
 <section class="card" style="grid-column: 1 / -1;">

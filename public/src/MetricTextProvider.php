@@ -14,7 +14,7 @@ final class MetricTextProvider
         'range_spread'       => 'Rozstęp',
         'last_digit_unique'  => 'Unikalne cyfry jedności',
         'profile_hash'       => 'Profil strukturalny',
-        'overdue_score'      => 'Wskaźnik zaległości',
+        'overdue_score'      => 'Wskaźnik przerwy',
         'current_gap'        => 'Przerwa',
         'avg_interval'       => 'Śr. co ile losowań',
         'window_freq'        => 'Ost. 500 losowań',
@@ -165,11 +165,12 @@ final class MetricTextProvider
                 . "niedostępne dla Multi Multi przy zmiennej liczbie liczb w zakładzie.",
 
             'overdue_score' =>
-                "Wskaźnik zaległości = aktualna przerwa ÷ średni interwał tej liczby. "
-                . "Wartość > 1,0 → liczba czeka dłużej niż jej historyczna średnia. "
-                . "Wartość > 2,0 → mocno zalega. "
-                . "Przykład: wartość 1,8 = ta liczba czeka 80% dłużej niż zwykle. "
-                . "Ważne: wysoki wskaźnik NIE zwiększa prawdopodobieństwa wypadnięcia — loteria nie ma pamięci.",
+                "Wskaźnik przerwy = aktualna przerwa ÷ średni interwał tej liczby. "
+                . "Wartość > 1,0 → przerwa dłuższa niż historyczna średnia. "
+                . "Wartość > 2,0 → przerwa znacznie powyżej średniej. "
+                . "Przykład: wartość 1,8 = przerwa 80% dłuższa niż przeciętna. "
+                . "UWAGA: to metryka czysto opisowa. Wysoka wartość NIE oznacza, że liczba jest 'zaległa' ani że ma większą szansę wypadnięcia. "
+                . "Loteria nie ma pamięci — każde losowanie jest niezależne.",
 
             'current_gap' =>
                 "Ile losowań minęło od ostatniego pojawienia się tej liczby. "

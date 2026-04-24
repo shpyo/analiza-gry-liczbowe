@@ -184,7 +184,7 @@ if ($hasVarBet) {
     <div class="page-header__row">
         <div>
             <h1 class="page-header__title">Generator kuponów</h1>
-            <p class="page-header__desc">Zaawansowane algorytmy dobierające liczby na podstawie historycznych trendów prawdopodobieństwa z ostatnich 500 losowań <?= h($gameDef->name) ?>.</p>
+            <p class="page-header__desc">Losowanie ważone częstością historyczną z ostatnich <?= AnalysisConfig::WINDOW_SIZE ?> losowań <?= h($gameDef->name) ?> z filtrami strukturalnymi.</p>
         </div>
     </div>
 </header>
@@ -195,7 +195,7 @@ if ($hasVarBet) {
 
             <div class="flex justify-between items-center mb-6" style="flex-wrap:wrap;gap:0.5rem;">
                 <div>
-                    <span class="badge badge--info mb-2"><?= render_material_icon('bolt') ?> SMART ENGINE ACTIVE</span>
+                    <span class="badge badge--info mb-2"><?= render_material_icon('bolt') ?> LOSOWANIE WAŻONE + FILTRY</span>
                     <h2 class="text-headline-lg" style="margin-top:0.5rem;">Generuj kupony</h2>
                 </div>
                 <div class="flex gap-3" style="flex-wrap:wrap;align-items:flex-end;">
@@ -430,24 +430,21 @@ if ($hasVarBet) {
 <!-- Analiza ukończona / PRO TIP (below form) -->
 <?php if ($formPosted && !empty($results)): ?>
 <section class="analysis-card" style="margin-top:1.5rem;">
-    <h3 class="text-headline-md mb-3" style="font-family:var(--font-headline);">Analiza ukończona</h3>
-    <p style="color:rgba(255,255,255,0.8);font-size:0.875rem;margin-bottom:1.5rem;line-height:1.6;">
-        Wygenerowano <?= count($results) ?> kuponów z wagami opartymi na historycznej częstości.
-        Top-10 gorących: <?= implode(', ', $top10) ?>.
+    <h3 class="text-headline-md mb-3" style="font-family:var(--font-headline);">Generowanie zakończone</h3>
+    <p style="color:rgba(255,255,255,0.8);font-size:0.875rem;margin-bottom:0.75rem;line-height:1.6;">
+        Wygenerowano <?= count($results) ?> kuponów z wagami opartymi na historycznej częstości z ostatnich <?= AnalysisConfig::WINDOW_SIZE ?> losowań.
+        Top-10 najczęstszych: <?= implode(', ', $top10) ?>.
     </p>
-    <div class="progress-bar" style="margin-bottom:0.5rem;">
-        <div class="progress-bar__fill" style="width:72%;"></div>
-    </div>
-    <div class="flex justify-between" style="font-size:0.75rem;opacity:0.8;">
-        <span>Zgodność z wzorcem</span>
-        <span style="font-weight:700;">72%</span>
-    </div>
+    <p style="color:rgba(255,255,255,0.55);font-size:0.75rem;line-height:1.5;">
+        Uwaga: historyczna częstość nie gwarantuje przyszłych wyników. Każda kombinacja ma identyczne prawdopodobieństwo wylosowania.
+    </p>
 </section>
 <?php else: ?>
 <section class="card card--tonal" style="margin-top:1.5rem;">
     <h3 class="text-headline-md mb-3">PRO TIP</h3>
     <p class="text-body-sm text-on-surface-variant leading-relaxed">
-        Wygenerowane liczby oparte są na trendach prawdopodobieństwa z ostatnich 500 losowań. Gorące liczby mają wyższe wagi, ale każda liczba ma szansę. Użyj filtrów, aby doprecyzować kryteria kuponu.
+        Wygenerowane liczby oparte są na częstości występowania z ostatnich <?= AnalysisConfig::WINDOW_SIZE ?> losowań. Częściej losowane liczby mają wyższe wagi, ale każda liczba ma szansę. Użyj filtrów, aby doprecyzować kryteria strukturalne kuponu.
+        Pamiętaj: w loterii każda kombinacja ma identyczne prawdopodobieństwo — filtry pomagają jedynie unikać nietypowych wzorców.
     </p>
 </section>
 <?php endif; ?>

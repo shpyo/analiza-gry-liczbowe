@@ -245,8 +245,8 @@ $oddPct  = 100 - $evenPct;
 $lowPct  = $totalNums500 > 0 ? round($lowTotal / $totalNums500 * 100) : 50;
 $highPct = 100 - $lowPct;
 
-// Probability index for hot numbers
-$probIndex = $maxFreq > 0 ? round($topHot[0]['window_freq'] / ($windowLimit * $pickCount / $poolSize) * 100, 1) : 0;
+// Frequency index for hot numbers (observed / expected ratio, NOT a probability prediction)
+$freqIndex = $maxFreq > 0 ? round($topHot[0]['window_freq'] / ($windowLimit * $pickCount / $poolSize) * 100, 1) : 0;
 
 // Decade frequency distribution (aggregated from $windowFreqMap, no extra SQL needed)
 $decadeFreq    = _decade_freq($windowFreqMap, $poolSize);
@@ -328,11 +328,12 @@ $maxDecadeFreq = max(1, ...array_values($decadeFreq));
                 <?php endforeach; ?>
             </div>
             <div style="background:rgba(255,255,255,0.2);backdrop-filter:blur(8px);border-radius:var(--radius-xl);padding:1rem;margin-top:auto;">
-                <span class="text-label-lg" style="color:var(--on-tertiary-fixed-variant);">INDEKS PRAWDOPODOBIEŃSTWA</span>
-                <div style="font-size:1.5rem;font-weight:900;font-family:var(--font-headline);color:var(--on-tertiary-fixed);"><?= h((string)$probIndex) ?>%</div>
+                <span class="text-label-lg" style="color:var(--on-tertiary-fixed-variant);" title="Stosunek obserwowanej częstości do oczekiwanej (100% = zgodna ze średnią). Nie jest to predykcja przyszłych losowań.">WSKAŹNIK CZĘSTOŚCI</span>
+                <div style="font-size:1.5rem;font-weight:900;font-family:var(--font-headline);color:var(--on-tertiary-fixed);"><?= h((string)$freqIndex) ?>%</div>
                 <div class="progress-bar" style="margin-top:0.5rem;background:rgba(0,0,0,0.1);">
-                    <div class="progress-bar__fill progress-bar__fill--tertiary" style="width:<?= min(100, $probIndex) ?>%;"></div>
+                    <div class="progress-bar__fill progress-bar__fill--tertiary" style="width:<?= min(100, $freqIndex) ?>%;"></div>
                 </div>
+                <p style="font-size:0.6875rem;color:var(--on-tertiary-fixed-variant);margin-top:0.375rem;opacity:0.8;">Obserwowana / oczekiwana częstość &mdash; nie jest predykcją</p>
             </div>
         </section>
 
@@ -512,9 +513,12 @@ $maxDecadeFreq = max(1, ...array_values($decadeFreq));
                 <td><?= $trendIcon ?></td>
                 <td><?= $statusBadge ?></td>
                 <td><?= h((string)$row['current_gap']) ?></td>
-                <td<?= $row['overdue_score'] > AnalysisConfig::OVERDUE_CRITICAL ? ' style="color:var(--error);font-weight:700;"' : ($row['overdue_score'] > AnalysisConfig::OVERDUE_WARNING ? ' style="color:var(--tertiary);"' : '') ?>><?= h((string)$row['overdue_score']) ?></td>
+                <td<?= $row['overdue_score'] > AnalysisConfig::OVERDUE_CRITICAL ? ' style="color:var(--outline);font-weight:600;"' : ($row['overdue_score'] > AnalysisConfig::OVERDUE_WARNING ? ' style="color:var(--outline);"' : '') ?> title="Stosunek przerwy do średniego interwału. Wysoka wartość NIE oznacza zwiększonego prawdopodobieństwa wylosowania."><?= h((string)$row['overdue_score']) ?></td>
             </tr>
         <?php endforeach; ?>
         </tbody>
     </table>
+    <p class="text-body-sm text-on-surface-variant" style="margin-top:1rem;font-style:italic;">
+        Wszystkie metryki mają charakter deskryptywny (opisują historię). Loteria nie ma pamięci &mdash; historyczna częstość ani przerwa nie wpływają na prawdopodobieństwo przyszłych losowań. Każda liczba ma takie samo szanse w każdym losowaniu.
+    </p>
 </div>
