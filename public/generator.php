@@ -57,9 +57,10 @@ if ($formPosted) {
         ? max($betPickMin, min($betPickMax, (int)($_POST['bet_pick_count'] ?? $betPickMax)))
         : $pickCount;
 
-    $sumAbsMax   = $poolSize * $betPickCount;
-    $sumMin      = isset($_POST['sum_min'])       ? min($sumAbsMax, max(0, (int)$_POST['sum_min']))         : 0;
-    $sumMax      = isset($_POST['sum_max'])       ? min($sumAbsMax, max(0, (int)$_POST['sum_max']))         : $sumAbsMax;
+    $sumAbsMin   = (int)($betPickCount * ($betPickCount + 1) / 2);
+    $sumAbsMax   = (int)($betPickCount * (2 * $poolSize - $betPickCount + 1) / 2);
+    $sumMin      = isset($_POST['sum_min'])       ? min($sumAbsMax, max($sumAbsMin, (int)$_POST['sum_min']))    : $sumAbsMin;
+    $sumMax      = isset($_POST['sum_max'])       ? min($sumAbsMax, max($sumAbsMin, (int)$_POST['sum_max']))    : $sumAbsMax;
     $evenMin     = isset($_POST['even_min'])      ? min($betPickCount, max(0, (int)$_POST['even_min']))     : 0;
     $evenMax     = isset($_POST['even_max'])      ? min($betPickCount, max(0, (int)$_POST['even_max']))     : $betPickCount;
     $lowMin      = isset($_POST['low_min'])       ? min($betPickCount, max(0, (int)$_POST['low_min']))      : 0;

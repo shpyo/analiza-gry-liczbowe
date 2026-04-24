@@ -74,39 +74,46 @@ final class CoOccurrenceRepository
             }
         }
 
-        // Bulk write pairs
-        $this->pdo->exec("DELETE FROM `{$pairsTable}`");
-        $pairsBatches = array_chunk(array_values($pairsAcc), self::BATCH_SIZE);
-        foreach ($pairsBatches as $batch) {
-            $placeholders = implode(', ', array_fill(0, count($batch), '(?, ?, ?, ?)'));
-            $values = [];
-            foreach ($batch as $entry) {
-                $values[] = $entry[2]; // n1
-                $values[] = $entry[3]; // n2
-                $values[] = $entry[0]; // count
-                $values[] = $entry[1]; // last_seen
+        // Bulk write inside a transaction so readers never see partial data
+        $this->pdo->beginTransaction();
+        try {
+            $this->pdo->exec("DELETE FROM `{$pairsTable}`");
+            $pairsBatches = array_chunk(array_values($pairsAcc), self::BATCH_SIZE);
+            foreach ($pairsBatches as $batch) {
+                $placeholders = implode(', ', array_fill(0, count($batch), '(?, ?, ?, ?)'));
+                $values = [];
+                foreach ($batch as $entry) {
+                    $values[] = $entry[2]; // n1
+                    $values[] = $entry[3]; // n2
+                    $values[] = $entry[0]; // count
+                    $values[] = $entry[1]; // last_seen
+                }
+                $this->pdo->prepare(
+                    "INSERT INTO `{$pairsTable}` (n1, n2, count, last_seen) VALUES {$placeholders}"
+                )->execute($values);
             }
-            $this->pdo->prepare(
-                "INSERT INTO `{$pairsTable}` (n1, n2, count, last_seen) VALUES {$placeholders}"
-            )->execute($values);
-        }
 
-        // Bulk write triples
-        $this->pdo->exec("DELETE FROM `{$triplesTable}`");
-        $triplesBatches = array_chunk(array_values($triplesAcc), self::BATCH_SIZE);
-        foreach ($triplesBatches as $batch) {
-            $placeholders = implode(', ', array_fill(0, count($batch), '(?, ?, ?, ?, ?)'));
-            $values = [];
-            foreach ($batch as $entry) {
-                $values[] = $entry[2]; // n1
-                $values[] = $entry[3]; // n2
-                $values[] = $entry[4]; // n3
-                $values[] = $entry[0]; // count
-                $values[] = $entry[1]; // last_seen
+            $this->pdo->exec("DELETE FROM `{$triplesTable}`");
+            $triplesBatches = array_chunk(array_values($triplesAcc), self::BATCH_SIZE);
+            foreach ($triplesBatches as $batch) {
+                $placeholders = implode(', ', array_fill(0, count($batch), '(?, ?, ?, ?, ?)'));
+                $values = [];
+                foreach ($batch as $entry) {
+                    $values[] = $entry[2]; // n1
+                    $values[] = $entry[3]; // n2
+                    $values[] = $entry[4]; // n3
+                    $values[] = $entry[0]; // count
+                    $values[] = $entry[1]; // last_seen
+                }
+                $this->pdo->prepare(
+                    "INSERT INTO `{$triplesTable}` (n1, n2, n3, count, last_seen) VALUES {$placeholders}"
+                )->execute($values);
             }
-            $this->pdo->prepare(
-                "INSERT INTO `{$triplesTable}` (n1, n2, n3, count, last_seen) VALUES {$placeholders}"
-            )->execute($values);
+
+            $this->pdo->commit();
+        } catch (\Throwable $e) {
+            $this->pdo->rollBack();
+            throw $e;
         }
     }
 
@@ -182,14 +189,15 @@ final class CoOccurrenceRepository
         $cPool2  = $pool * ($pool - 1) / 2;
         $pairExp = $cPool2 > 0 ? ($totalDraws * $cPick2 / $cPool2) : 0;
 
+        // Fetch all pairs above minCount and rank by lift in SQL
         $stmt = $this->pdo->prepare(
             "SELECT n1, n2, count, last_seen
              FROM `{$pairsTable}`
              WHERE count >= ?
-             ORDER BY count DESC
+             ORDER BY (count / ?) DESC
              LIMIT ?"
         );
-        $stmt->execute([$minCount, $limit]);
+        $stmt->execute([$minCount, max($pairExp, 1e-9), $limit]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $result = [];
@@ -206,8 +214,6 @@ final class CoOccurrenceRepository
                 'last_seen' => (string)$row['last_seen'],
             ];
         }
-        // Sort by lift descending
-        usort($result, fn($a, $b) => $b['lift'] <=> $a['lift']);
         return $result;
     }
 
@@ -235,14 +241,15 @@ final class CoOccurrenceRepository
         $cPool3  = $pool * ($pool - 1) * ($pool - 2) / 6;
         $triExp  = $cPool3 > 0 ? ($totalDraws * $cPick3 / $cPool3) : 0;
 
+        // Fetch all triples above minCount and rank by lift in SQL
         $stmt = $this->pdo->prepare(
             "SELECT n1, n2, n3, count, last_seen
              FROM `{$triplesTable}`
              WHERE count >= ?
-             ORDER BY count DESC
+             ORDER BY (count / ?) DESC
              LIMIT ?"
         );
-        $stmt->execute([$minCount, $limit]);
+        $stmt->execute([$minCount, max($triExp, 1e-9), $limit]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $result = [];
@@ -260,7 +267,6 @@ final class CoOccurrenceRepository
                 'last_seen' => (string)$row['last_seen'],
             ];
         }
-        usort($result, fn($a, $b) => $b['lift'] <=> $a['lift']);
         return $result;
     }
 }

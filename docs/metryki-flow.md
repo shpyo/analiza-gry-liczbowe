@@ -906,7 +906,7 @@ P(49) =  1 / Σ(weights) ≈  1/3000 ≈ 0.03%
 
 ## 8. Multi Multi — filtry dla zakładów o zmiennej liczbie liczb
 
-Multi Multi (20/80) pozwala graczowi wybrać **2–10 własnych liczb** z puli 80.
+Multi Multi (20/80) pozwala graczowi wybrać **1–10 własnych liczb** z puli 80.
 To fundamentalnie różni się od gier o stałym `pickCount`.
 
 ### Problem profilu strukturalnego (hash)

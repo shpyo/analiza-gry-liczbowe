@@ -119,10 +119,10 @@ final class MetricTextProvider
                   . "Przykład: k=10 → zalecane min 5 różnych dziesiątek, max 2 z jednej."
                 : ($isMini
                     ? "Z ilu różnych dziesiątek pochodzi kombinacja. "
-                      . "Pula 1–42: grupy 1–9, 10–19, 20–29, 30–39, 40–42 (5 grup). "
+                      . "Pula 1–42: grupy 1–10, 11–20, 21–30, 31–40, 41–42 (5 grup). "
                       . "Typowo: 4–5 różnych dziesiątek w 5 liczbach. "
                       . "Mniej niż 3 = skupienie liczb w wąskim przedziale puli."
-                    : "Z ilu różnych dziesiątek (1–9, 10–19, 20–29, 30–39, 40–49) pochodzi kombinacja. "
+                    : "Z ilu różnych dziesiątek (1–10, 11–20, 21–30, 31–40, 41–49) pochodzi kombinacja. "
                       . "Pula Lotto ma 5 grup dziesiętnych. "
                       . "Typowo: 4–5 różnych dziesiątek w kuponie 6-liczbowym. "
                       . "Mniej niż 3 = skupienie w wąskim zakresie puli — rzadkie wzorce."
