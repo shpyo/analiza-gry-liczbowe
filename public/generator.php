@@ -153,30 +153,51 @@ if ($formPosted) {
 $defBetPickCount = $hasVarBet
     ? max($betPickMin, min($betPickMax, (int)($_POST['bet_pick_count'] ?? $betPickMax)))
     : $pickCount;
-$defSumAbsMax = $poolSize * $defBetPickCount;
-$def = [
-    'sum_min'        => min($defSumAbsMax, max(0, (int)($_POST['sum_min']        ?? 0))),
-    'sum_max'        => min($defSumAbsMax, max(0, (int)($_POST['sum_max']        ?? $defSumAbsMax))),
-    'even_min'       => min($defBetPickCount, max(0, (int)($_POST['even_min']    ?? 0))),
-    'even_max'       => min($defBetPickCount, max(0, (int)($_POST['even_max']    ?? $defBetPickCount))),
-    'low_min'        => min($defBetPickCount, max(0, (int)($_POST['low_min']     ?? 0))),
-    'low_max'        => min($defBetPickCount, max(0, (int)($_POST['low_max']     ?? $defBetPickCount))),
-    'consec_max'     => min($defBetPickCount - 1, max(0, (int)($_POST['consec_max'] ?? $defBetPickCount - 1))),
-    'hot_min'        => min($defBetPickCount, max(0, (int)($_POST['hot_min']     ?? 0))),
-    'last_digit_max' => min($defBetPickCount, max(1, (int)($_POST['last_digit_max'] ?? $defBetPickCount))),
-    'decades_max'    => min($defBetPickCount, max(1, (int)($_POST['decades_max']    ?? $defBetPickCount))),
-    'decades_min'    => max(1, (int)($_POST['decades_min']    ?? 1)),
-    'count'          => (int)($_POST['count']          ?? 5),
-    'bet_pick_count' => $defBetPickCount,
-];
-$postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hashes'])
-    ? $_POST['profile_hashes'] : [];
 
 // Sum range data for variable-bet games (e.g. Multi Multi)
 $sumRangeData = [];
 if ($hasVarBet) {
     $sumRangeData = $kit->texts()->sumRangesForVarBet($gameDef);
 }
+
+// Smart defaults: use typical ranges (mean ± 1.5σ) instead of full 0–max
+$k  = $defBetPickCount;
+$N  = $poolSize;
+$sumMean  = $k * ($N + 1) / 2;
+$sumSigma = sqrt($k * ($N + 1) * ($N - $k) / 12);
+$defSumMin = max((int)($k * ($k + 1) / 2), (int)round($sumMean - 1.5 * $sumSigma));
+$defSumMax = min((int)($k * (2 * $N - $k + 1) / 2), (int)round($sumMean + 1.5 * $sumSigma));
+
+// Even/low: binomial mean ± 1 (for k numbers from pool, ~half are even/low)
+$evenMean = $k / 2;
+$defEvenMin = max(0, (int)floor($evenMean - 1));
+$defEvenMax = min($k, (int)ceil($evenMean + 1));
+$lowRatio   = $gameDef->lowThreshold / $N;
+$lowMean    = $k * $lowRatio;
+$defLowMin  = max(0, (int)floor($lowMean - 1));
+$defLowMax  = min($k, (int)ceil($lowMean + 1));
+
+// Decades: typical spread
+$defDecadesMin = max(1, (int)round($k * 0.5));
+
+$defSumAbsMax = (int)($k * (2 * $N - $k + 1) / 2);
+$def = [
+    'sum_min'        => min($defSumAbsMax, max(0, (int)($_POST['sum_min']        ?? $defSumMin))),
+    'sum_max'        => min($defSumAbsMax, max(0, (int)($_POST['sum_max']        ?? $defSumMax))),
+    'even_min'       => min($k, max(0, (int)($_POST['even_min']    ?? $defEvenMin))),
+    'even_max'       => min($k, max(0, (int)($_POST['even_max']    ?? $defEvenMax))),
+    'low_min'        => min($k, max(0, (int)($_POST['low_min']     ?? $defLowMin))),
+    'low_max'        => min($k, max(0, (int)($_POST['low_max']     ?? $defLowMax))),
+    'consec_max'     => min($k - 1, max(0, (int)($_POST['consec_max'] ?? 2))),
+    'hot_min'        => min($k, max(0, (int)($_POST['hot_min']     ?? 0))),
+    'last_digit_max' => min($k, max(1, (int)($_POST['last_digit_max'] ?? $k))),
+    'decades_max'    => min($k, max(1, (int)($_POST['decades_max']    ?? $k))),
+    'decades_min'    => max(1, (int)($_POST['decades_min']    ?? $defDecadesMin)),
+    'count'          => (int)($_POST['count']          ?? 5),
+    'bet_pick_count' => $defBetPickCount,
+];
+$postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hashes'])
+    ? $_POST['profile_hashes'] : [];
 ?>
 
 <!-- Page Header -->
@@ -271,7 +292,8 @@ if ($hasVarBet) {
                     const ranges = <?= json_encode($sumRangeData, JSON_THROW_ON_ERROR) ?>;
                     const sel = document.querySelector('[name="bet_pick_count"]');
                     if (!sel) return;
-                    function updateHint(k) {
+                    const posted = <?= $formPosted ? 'true' : 'false' ?>;
+                    function updateHint(k, updateValues) {
                         const r = ranges[k];
                         if (!r) return;
                         document.getElementById('sum-hint-k').textContent = k;
@@ -282,8 +304,12 @@ if ($hasVarBet) {
                         const sumMaxEl = document.querySelector('[name="sum_max"]');
                         if (sumMinEl) { sumMinEl.min = r.min; sumMinEl.max = r.max; }
                         if (sumMaxEl) { sumMaxEl.min = r.min; sumMaxEl.max = r.max; }
+                        if (updateValues) {
+                            if (sumMinEl) sumMinEl.value = r.typ_min;
+                            if (sumMaxEl) sumMaxEl.value = r.typ_max;
+                        }
                     }
-                    sel.addEventListener('change', function() { updateHint(parseInt(this.value)); });
+                    sel.addEventListener('change', function() { updateHint(parseInt(this.value), true); });
                 })();
                 </script>
                 <?php endif; ?>
