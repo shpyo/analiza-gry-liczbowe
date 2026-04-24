@@ -16,7 +16,24 @@ final class GameDefinition
         public readonly BucketStrategy $sumBuckets,
         public readonly BucketStrategy $rangeBuckets,
         public readonly LineParser     $lineParser,
+        // Optional: min/max numbers in a player's bet (null = same as pickCount)
+        public readonly ?int           $betPickMin = null,
+        public readonly ?int           $betPickMax = null,
+        // Whether this game has co-occurrence (pairs/triples) tables
+        public readonly bool           $coOccurrence = false,
     ) {
+    }
+
+    /** Minimum numbers in a player's bet (equals pickCount for standard games). */
+    public function betPickMin(): int
+    {
+        return $this->betPickMin ?? $this->pickCount;
+    }
+
+    /** Maximum numbers in a player's bet (equals pickCount for standard games). */
+    public function betPickMax(): int
+    {
+        return $this->betPickMax ?? $this->pickCount;
     }
 
     /** @return string[] e.g. ['n1','n2','n3','n4','n5','n6'] */

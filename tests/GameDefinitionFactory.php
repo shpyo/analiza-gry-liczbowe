@@ -95,4 +95,37 @@ final class GameDefinitionFactory
             lineParser: new MbnetLineParser(6, true),
         );
     }
+
+    public static function multiMulti(): GameDefinition
+    {
+        return new GameDefinition(
+            slug: 'multi_multi',
+            name: 'Multi Multi',
+            pickCount: 20,
+            poolSize: 80,
+            lowThreshold: 40,
+            hasBonus: false,
+            syncUrl: null,
+            drawsTable: 'multi_multi_draws',
+            profileTable: 'multi_multi_draw_profiles',
+            sumBuckets: new ThresholdBucketStrategy([
+                ['label' => 'XS', 'max' => 675,  'description' => 'bardzo mała (≤675)'],
+                ['label' => 'S',  'max' => 745,  'description' => 'mała (676–745)'],
+                ['label' => 'M',  'max' => 875,  'description' => 'średnia (746–875)'],
+                ['label' => 'L',  'max' => 945,  'description' => 'duża (876–945)'],
+                ['label' => 'XL', 'max' => null, 'description' => 'bardzo duża (946+)'],
+            ]),
+            rangeBuckets: new ThresholdBucketStrategy([
+                ['label' => 'XS', 'max' => 62,   'description' => 'bardzo mały (≤62)'],
+                ['label' => 'S',  'max' => 70,   'description' => 'mały (63–70)'],
+                ['label' => 'M',  'max' => 75,   'description' => 'średni (71–75)'],
+                ['label' => 'L',  'max' => 78,   'description' => 'duży (76–78)'],
+                ['label' => 'XL', 'max' => null, 'description' => 'bardzo duży (79+)'],
+            ]),
+            lineParser: new MbnetLineParser(20, false),
+            betPickMin: 1,
+            betPickMax: 10,
+            coOccurrence: true,
+        );
+    }
 }

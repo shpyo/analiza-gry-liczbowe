@@ -209,6 +209,24 @@ function _heatmap_bucket(int $freq, array $q): int {
     return count($q);
 }
 
+/**
+ * Aggregate a number→frequency map into decade buckets (1-indexed: decade 1 = 1–10, etc.).
+ * Works for any pool size; the last bucket may be smaller than 10.
+ *
+ * @param  array<int,int> $freqMap  number → frequency
+ * @param  int            $poolSize largest number in pool
+ * @return array<int,int>           decade index → total frequency
+ */
+function _decade_freq(array $freqMap, int $poolSize): array
+{
+    $count  = (int)ceil($poolSize / 10);
+    $result = array_fill(1, $count, 0);
+    for ($n = 1; $n <= $poolSize; $n++) {
+        $result[(int)ceil($n / 10)] += $freqMap[$n] ?? 0;
+    }
+    return $result;
+}
+
 // Compute overall odd/even/low/high from last N draws
 $evenTotal = 0;
 $lowTotal  = 0;
@@ -227,8 +245,13 @@ $oddPct  = 100 - $evenPct;
 $lowPct  = $totalNums500 > 0 ? round($lowTotal / $totalNums500 * 100) : 50;
 $highPct = 100 - $lowPct;
 
-// Probability index for hot numbers
-$probIndex = $maxFreq > 0 ? round($topHot[0]['window_freq'] / ($windowLimit * $pickCount / $poolSize) * 100, 1) : 0;
+// Frequency index for hot numbers (observed / expected ratio, NOT a probability prediction)
+$freqIndex = $maxFreq > 0 ? round($topHot[0]['window_freq'] / ($windowLimit * $pickCount / $poolSize) * 100, 1) : 0;
+
+// Decade frequency distribution (aggregated from $windowFreqMap, no extra SQL needed)
+$decadeFreq    = _decade_freq($windowFreqMap, $poolSize);
+$decadeCount   = count($decadeFreq);
+$maxDecadeFreq = max(1, ...array_values($decadeFreq));
 ?>
 
 <!-- Page Header -->
@@ -305,11 +328,12 @@ $probIndex = $maxFreq > 0 ? round($topHot[0]['window_freq'] / ($windowLimit * $p
                 <?php endforeach; ?>
             </div>
             <div style="background:rgba(255,255,255,0.2);backdrop-filter:blur(8px);border-radius:var(--radius-xl);padding:1rem;margin-top:auto;">
-                <span class="text-label-lg" style="color:var(--on-tertiary-fixed-variant);">INDEKS PRAWDOPODOBIEŃSTWA</span>
-                <div style="font-size:1.5rem;font-weight:900;font-family:var(--font-headline);color:var(--on-tertiary-fixed);"><?= h((string)$probIndex) ?>%</div>
+                <span class="text-label-lg" style="color:var(--on-tertiary-fixed-variant);" title="Stosunek obserwowanej częstości do oczekiwanej (100% = zgodna ze średnią). Nie jest to predykcja przyszłych losowań.">WSKAŹNIK CZĘSTOŚCI</span>
+                <div style="font-size:1.5rem;font-weight:900;font-family:var(--font-headline);color:var(--on-tertiary-fixed);"><?= h((string)$freqIndex) ?>%</div>
                 <div class="progress-bar" style="margin-top:0.5rem;background:rgba(0,0,0,0.1);">
-                    <div class="progress-bar__fill progress-bar__fill--tertiary" style="width:<?= min(100, $probIndex) ?>%;"></div>
+                    <div class="progress-bar__fill progress-bar__fill--tertiary" style="width:<?= min(100, $freqIndex) ?>%;"></div>
                 </div>
+                <p style="font-size:0.6875rem;color:var(--on-tertiary-fixed-variant);margin-top:0.375rem;opacity:0.8;">Obserwowana / oczekiwana częstość &mdash; nie jest predykcją</p>
             </div>
         </section>
 
@@ -371,8 +395,10 @@ $probIndex = $maxFreq > 0 ? round($topHot[0]['window_freq'] / ($windowLimit * $p
     </div>
 </div>
 
+<div style="display:flex;gap:1.5rem;margin-bottom:2rem;align-items:flex-start;flex-wrap:wrap;">
+
 <!-- Heatmap Section -->
-<div class="card mb-8">
+<div class="card" style="flex:2;min-width:20rem;">
     <h2 class="text-headline-md mb-4">Heatmapa częstości &mdash; ostatnie 500 losowań</h2>
     <div class="hm-grid" style="margin-bottom:1rem;">
         <?php for ($n = 1; $n <= $poolSize; $n++):
@@ -398,23 +424,58 @@ $probIndex = $maxFreq > 0 ? round($topHot[0]['window_freq'] / ($windowLimit * $p
     </div>
 </div>
 
+<!-- Decade Distribution Chart -->
+<div class="card" style="flex:1;min-width:16rem;">
+    <div class="mb-4">
+        <h2 class="text-headline-md">Rozkład dziesiątek</h2>
+        <p class="text-body-sm text-on-surface-variant">Suma trafień per przedział &mdash; ostatnie <?= AnalysisConfig::WINDOW_SIZE ?> losowań</p>
+    </div>
+    <div class="dist-bars">
+        <?php for ($d = 1; $d <= $decadeCount; $d++):
+            $lo   = ($d - 1) * 10 + 1;
+            $hi   = min($d * 10, $poolSize);
+            $freq = $decadeFreq[$d];
+            $pct  = $maxDecadeFreq > 0 ? round($freq / $maxDecadeFreq * 100) : 0;
+            $fillClass = $pct >= 80 ? 'dist-bar__fill--primary' : 'dist-bar__fill--secondary';
+        ?>
+        <div class="dist-bar">
+            <span class="dist-bar__label"><?= $lo ?>–<?= $hi ?></span>
+            <div class="dist-bar__track">
+                <div class="dist-bar__fill <?= $fillClass ?>" style="width:<?= max(4, $pct) ?>%;"><?= $freq ?></div>
+            </div>
+        </div>
+        <?php endfor; ?>
+    </div>
+</div>
+
+</div><!-- /flex heatmap+decades row -->
+
 <!-- Granular Data Matrix -->
 <div class="card">
-    <div class="flex justify-between items-center mb-6" style="flex-wrap:wrap;gap:1rem;">
-        <div>
-            <h2 class="text-headline-md">Szczegółowa macierz danych</h2>
-            <p class="text-body-sm text-on-surface-variant">Analiza metryki wydajności każdej liczby</p>
+    <div class="mb-6">
+        <h2 class="text-headline-md">Szczegółowa macierz danych</h2>
+        <div style="margin-top:0.75rem;padding:0.75rem 1rem;background:var(--surface-container-low);border-radius:var(--radius-sm);font-size:0.8125rem;line-height:1.7;color:var(--on-surface-variant);">
+            <strong>Jak czytać tabelę:</strong><br>
+            <strong>Trafienia (ogółem)</strong> &mdash; ile razy dana liczba padła we wszystkich losowaniach w historii.<br>
+            <strong>Trafienia (ost. <?= AnalysisConfig::WINDOW_SIZE ?>)</strong> &mdash; ile razy padła w ostatnich <?= AnalysisConfig::WINDOW_SIZE ?> losowaniach. Na tej podstawie wyznaczany jest status.<br>
+            <strong>Status</strong> &mdash;
+            <?= render_badge('Częsta', 'hot') ?> powyżej średniej + 1,5&sigma;,
+            <?= render_badge('Rzadka', 'cold') ?> poniżej średniej &minus; 1,5&sigma;,
+            <?= render_badge('Typowa', 'stable') ?> w normie,
+            <?= render_badge('Nieaktywna', 'rare') ?> brak trafień w oknie.<br>
+            <strong>Przerwa (losowań)</strong> &mdash; ile losowań minęło od ostatniego pojawienia się tej liczby.<br>
+            <strong>Wsk. przerwy</strong> &mdash; aktualna przerwa ÷ średni interwał (1,0 = typowa, &gt;2,0 = dłuższa niż zwykle).<br>
+            Wszystkie dane opisują historię &mdash; nie przewidują przyszłych losowań.
         </div>
     </div>
 
+    <div class="table-scroll">
     <table class="data-table">
         <thead>
             <tr>
                 <th><a href="<?= h(stats_sort_url('num')) ?>">Liczba<?= sort_arrow('num') ?></a></th>
                 <th><a href="<?= h(stats_sort_url('total_freq')) ?>"><?= $kit->texts()->renderTooltip('total_freq', $gameDef) ?><?= sort_arrow('total_freq') ?></a></th>
                 <th><a href="<?= h(stats_sort_url('window_freq')) ?>"><?= $kit->texts()->renderTooltip('window_freq', $gameDef) ?><?= sort_arrow('window_freq') ?></a></th>
-                <th>Częstość</th>
-                <th>Trend</th>
                 <th>Status</th>
                 <th><a href="<?= h(stats_sort_url('current_gap')) ?>"><?= $kit->texts()->renderTooltip('current_gap', $gameDef) ?><?= sort_arrow('current_gap') ?></a></th>
                 <th><a href="<?= h(stats_sort_url('overdue_score')) ?>"><?= $kit->texts()->renderTooltip('overdue_score', $gameDef) ?><?= sort_arrow('overdue_score') ?></a></th>
@@ -430,40 +491,30 @@ $probIndex = $maxFreq > 0 ? round($topHot[0]['window_freq'] / ($windowLimit * $p
 
             if ($isInactive) {
                 $statusBadge = render_badge('Nieaktywna', 'rare');
-                $trendIcon   = '';
             } elseif ($isHot) {
-                $statusBadge = render_badge('Gorąca', 'hot');
-                $trendIcon   = '<span class="material-symbols-outlined text-primary" style="font-size:1.125rem;">trending_up</span>';
+                $statusBadge = render_badge('Częsta', 'hot');
             } elseif ($isCold) {
-                $statusBadge = render_badge('Zimna', 'cold');
-                $trendIcon   = '<span class="material-symbols-outlined text-error" style="font-size:1.125rem;">trending_down</span>';
+                $statusBadge = render_badge('Rzadka', 'cold');
             } else {
-                $statusBadge = render_badge('Stabilna', 'stable');
-                $trendIcon   = '<span class="material-symbols-outlined text-primary" style="font-size:1.125rem;">trending_up</span>';
+                $statusBadge = render_badge('Typowa', 'stable');
             }
 
             // Number ball style
             $ballMod = $isHot ? 'sm ball--hot' : 'sm';
-
-            // Frequency bar width
-            $freqPct = $maxFreq > 0 ? round($row['window_freq'] / $maxFreq * 100) : 0;
-            $freqBarColor = $isHot ? 'var(--tertiary)' : 'var(--secondary-container)';
             ?>
             <tr>
                 <td><?= render_ball($row['num'], $ballMod) ?></td>
                 <td><strong><?= h((string)$row['total_freq']) ?></strong></td>
                 <td><?= h((string)$row['window_freq']) ?></td>
-                <td style="min-width:8rem;">
-                    <div class="progress-bar" style="height:0.375rem;">
-                        <div class="progress-bar__fill" style="width:<?= $freqPct ?>%;background:<?= $freqBarColor ?>;"></div>
-                    </div>
-                </td>
-                <td><?= $trendIcon ?></td>
                 <td><?= $statusBadge ?></td>
                 <td><?= h((string)$row['current_gap']) ?></td>
-                <td<?= $row['overdue_score'] > AnalysisConfig::OVERDUE_CRITICAL ? ' style="color:var(--error);font-weight:700;"' : ($row['overdue_score'] > AnalysisConfig::OVERDUE_WARNING ? ' style="color:var(--tertiary);"' : '') ?>><?= h((string)$row['overdue_score']) ?></td>
+                <td<?= $row['overdue_score'] > AnalysisConfig::OVERDUE_CRITICAL ? ' style="color:var(--outline);font-weight:600;"' : ($row['overdue_score'] > AnalysisConfig::OVERDUE_WARNING ? ' style="color:var(--outline);"' : '') ?> title="Stosunek przerwy do średniego interwału. Wysoka wartość NIE oznacza zwiększonego prawdopodobieństwa wylosowania."><?= h((string)$row['overdue_score']) ?></td>
             </tr>
         <?php endforeach; ?>
         </tbody>
     </table>
+    </div>
+    <p class="text-body-sm text-on-surface-variant" style="margin-top:1rem;font-style:italic;">
+        Wszystkie metryki mają charakter deskryptywny (opisują historię). Loteria nie ma pamięci &mdash; historyczna częstość ani przerwa nie wpływają na prawdopodobieństwo przyszłych losowań. Każda liczba ma takie samo szanse w każdym losowaniu.
+    </p>
 </div>

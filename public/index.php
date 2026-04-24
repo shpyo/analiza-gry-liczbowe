@@ -14,7 +14,7 @@ $kit = new GameKit($pdo);
 // -----------------------------------------------------------------------
 // Routing
 // -----------------------------------------------------------------------
-$allowedPages = ['dashboard', 'draws', 'stats', 'generator', 'validator', 'sync', 'import'];
+$allowedPages = ['dashboard', 'draws', 'stats', 'generator', 'validator', 'cooccurrence', 'sync', 'import'];
 $page = isset($_GET['page']) ? trim($_GET['page']) : 'dashboard';
 if (!in_array($page, $allowedPages, true)) {
     $page = 'dashboard';
@@ -95,9 +95,12 @@ foreach ($kit->registry()->allSlugs() as $_slug) {
                 'stats'     => ['icon' => 'analytics',   'label' => NAV_LABELS['stats']],
                 'generator' => ['icon' => 'casino',      'label' => NAV_LABELS['generator']],
                 'validator' => ['icon' => 'task_alt',     'label' => NAV_LABELS['validator']],
-                'sync'      => ['icon' => 'sync',        'label' => NAV_LABELS['sync']],
-                'import'    => ['icon' => 'download',    'label' => NAV_LABELS['import']],
             ];
+            if ($gameDef->coOccurrence) {
+                $sidebarLinks['cooccurrence'] = ['icon' => 'hub', 'label' => NAV_LABELS['cooccurrence']];
+            }
+            $sidebarLinks['sync']   = ['icon' => 'sync',     'label' => NAV_LABELS['sync']];
+            $sidebarLinks['import'] = ['icon' => 'download', 'label' => NAV_LABELS['import']];
             foreach ($sidebarLinks as $pg => $meta):
                 $isActive = ($pg === $page);
                 $url = '?page=' . urlencode($pg) . '&game=' . urlencode($game);

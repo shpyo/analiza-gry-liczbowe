@@ -744,6 +744,15 @@ img { max-width: 100%; display: block; }
   transition: all 0.3s;
   width: 100%;
 }
+.form-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='%23727785'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.625rem center;
+  padding-right: 2.25rem;
+  cursor: pointer;
+}
 .form-input:focus,
 .form-select:focus {
   outline: none;
@@ -776,11 +785,11 @@ img { max-width: 100%; display: block; }
   color: var(--outline);
 }
 
-/* --- Data Table (borderless, tonal rows) --- */
+/* --- Data Table (borderless, tonal rows — compact) --- */
 .data-table {
   width: 100%;
   border-collapse: separate;
-  border-spacing: 0 0.5rem;
+  border-spacing: 0 0.25rem;
 }
 .data-table thead th {
   font-size: 0.6875rem;
@@ -788,7 +797,7 @@ img { max-width: 100%; display: block; }
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--outline);
-  padding: 0.5rem 1rem;
+  padding: 0.375rem 0.75rem;
   text-align: left;
   border: none;
   background: transparent;
@@ -813,8 +822,8 @@ img { max-width: 100%; display: block; }
   box-shadow: var(--shadow-sm);
 }
 .data-table tbody td {
-  padding: 0.75rem 1rem;
-  font-size: 0.875rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
   color: var(--on-surface);
   border: none;
   vertical-align: middle;
@@ -824,6 +833,12 @@ img { max-width: 100%; display: block; }
 }
 .data-table tbody td:last-child {
   border-radius: 0 var(--radius-xl) var(--radius-xl) 0;
+}
+
+/* Table horizontal scroll wrapper */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Sort indicator */
@@ -885,11 +900,12 @@ img { max-width: 100%; display: block; }
   transform: scale(1.1);
 }
 
-/* --- Tooltip Trigger --- */
+/* --- Tooltip Trigger (CSS-only custom tooltips) --- */
 .tooltip-trigger {
   text-decoration: none;
   cursor: help;
   border-bottom: 1px dotted var(--outline-variant);
+  position: relative;
 }
 .tooltip-trigger .tooltip-icon {
   display: inline-flex;
@@ -904,6 +920,51 @@ img { max-width: 100%; display: block; }
   font-weight: 700;
   margin-left: 0.25rem;
   vertical-align: middle;
+}
+.tooltip-trigger::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--inverse-surface);
+  color: var(--inverse-on-surface);
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.5;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-lg);
+  white-space: normal;
+  width: max-content;
+  max-width: 20rem;
+  z-index: 100;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  box-shadow: var(--shadow-lg);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.tooltip-trigger:hover::after,
+.tooltip-trigger:focus::after {
+  opacity: 1;
+}
+/* On mobile: show tooltip as always-visible inline hint */
+@media (max-width: 767px) {
+  .tooltip-trigger::after {
+    position: static;
+    display: block;
+    transform: none;
+    opacity: 1;
+    background: var(--surface-container-low);
+    color: var(--on-surface-variant);
+    margin-top: 0.25rem;
+    width: auto;
+    max-width: none;
+    box-shadow: none;
+    font-size: 0.6875rem;
+    padding: 0.375rem 0.5rem;
+  }
 }
 
 /* --- Coupon (generated/validated) --- */
@@ -1047,6 +1108,149 @@ img { max-width: 100%; display: block; }
   padding-top: 2rem;
   margin-top: 2rem;
   border-top: 1px solid var(--surface-container);
+}
+
+/* --- Filter divider --- */
+.filter-divider {
+  border: none;
+  border-top: 1px solid var(--outline-variant);
+  margin: 1.25rem 0;
+}
+
+/* --- Filter Section (grouped fieldset) --- */
+.filter-section {
+  background: var(--surface-container-low);
+  border-radius: var(--radius-xl);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+  border-left: 3px solid var(--primary-fixed-dim);
+}
+.filter-section__title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--primary);
+  margin-bottom: 0.75rem;
+}
+.filter-section .form-group {
+  gap: 0.125rem;
+}
+
+/* --- Filter Info (collapsible hint) --- */
+.filter-info {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--on-surface-variant);
+  line-height: 1.5;
+}
+.filter-info summary {
+  cursor: pointer;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--outline);
+  font-weight: 500;
+}
+.filter-info summary::-webkit-details-marker { display: none; }
+.filter-info summary .material-symbols-outlined {
+  font-size: 0.875rem;
+}
+.filter-info .filter-info__body {
+  margin-top: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface-container-lowest);
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--on-surface-variant);
+}
+
+/* --- Range label (between min/max) --- */
+.range-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--outline);
+  align-self: flex-end;
+  padding-bottom: 0.625rem;
+}
+
+/* --- Filter grid layouts --- */
+.filter-grid-range {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 0.75rem;
+  align-items: end;
+}
+.filter-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+@media (min-width: 768px) {
+  .filter-grid-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+.filter-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+/* --- Sticky form actions --- */
+.form-actions-sticky {
+  position: sticky;
+  bottom: 0;
+  background: var(--surface-container-lowest);
+  padding: 1rem 0;
+  margin: 0 -2rem;
+  padding-left: 2rem;
+  padding-right: 2rem;
+  border-top: 1px solid var(--surface-container-high);
+  z-index: 10;
+  border-radius: 0 0 var(--radius-4xl) var(--radius-4xl);
+}
+
+/* --- Profile checkbox list --- */
+.profile-checkboxes {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.375rem;
+  max-height: 20rem;
+  overflow-y: auto;
+}
+@media (min-width: 768px) {
+  .profile-checkboxes {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.profile-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.625rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 0.15s;
+  font-size: 0.8125rem;
+}
+.profile-check:hover {
+  background: var(--surface-container-high);
+}
+.profile-check input[type="checkbox"] {
+  accent-color: var(--primary);
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+.profile-check__pct {
+  margin-left: auto;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--outline);
 }
 
 /* --- Details/Summary (collapsible) --- */

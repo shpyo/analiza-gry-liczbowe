@@ -54,6 +54,9 @@ final class GameRegistry
             sumBuckets:    $sumBuckets,
             rangeBuckets:  $rangeBuckets,
             lineParser:    $lineParser,
+            betPickMin:    $slug === 'multi_multi' ? 1 : null,
+            betPickMax:    $slug === 'multi_multi' ? 10 : null,
+            coOccurrence:  $slug === 'multi_multi',
         );
 
         $this->cache[$slug] = $def;
@@ -119,6 +122,23 @@ final class GameRegistry
             ['label' => 'M',  'max' => 31,   'description' => 'średni (23–31)'],
             ['label' => 'L',  'max' => 37,   'description' => 'duży (32–37)'],
             ['label' => 'XL', 'max' => null, 'description' => 'bardzo duży (38+)'],
+        ]);
+
+        // -- Multi Multi strategies (20 numbers from 1–80) --
+        $this->sumStrategies['multi_multi'] = new ThresholdBucketStrategy([
+            ['label' => 'XS', 'max' => 675,  'description' => 'bardzo mała (≤675)'],
+            ['label' => 'S',  'max' => 745,  'description' => 'mała (676–745)'],
+            ['label' => 'M',  'max' => 875,  'description' => 'średnia (746–875)'],
+            ['label' => 'L',  'max' => 945,  'description' => 'duża (876–945)'],
+            ['label' => 'XL', 'max' => null, 'description' => 'bardzo duża (946+)'],
+        ]);
+
+        $this->rangeStrategies['multi_multi'] = new ThresholdBucketStrategy([
+            ['label' => 'XS', 'max' => 62,   'description' => 'bardzo mały (≤62)'],
+            ['label' => 'S',  'max' => 70,   'description' => 'mały (63–70)'],
+            ['label' => 'M',  'max' => 75,   'description' => 'średni (71–75)'],
+            ['label' => 'L',  'max' => 78,   'description' => 'duży (76–78)'],
+            ['label' => 'XL', 'max' => null, 'description' => 'bardzo duży (79+)'],
         ]);
     }
 }

@@ -68,4 +68,28 @@ final class MbnetLineParserTest extends TestCase
         $this->assertNotNull($result);
         $this->assertSame([3, 7, 14, 22, 35, 48], $result['numbers']); // sorted
     }
+
+    public function testParseMultiMultiLine(): void
+    {
+        $parser = new MbnetLineParser(20, false);
+        $numbers = '1,5,8,12,15,20,23,28,31,35,40,44,47,52,55,60,63,68,71,78';
+
+        $result = $parser->parse('9999. 14.04.2026 ' . $numbers);
+
+        $this->assertNotNull($result);
+        $this->assertSame(9999, $result['draw_number']);
+        $this->assertSame('2026-04-14', $result['draw_date']);
+        $this->assertCount(20, $result['numbers']);
+        $this->assertSame(1, $result['numbers'][0]);   // sorted, first
+        $this->assertSame(78, $result['numbers'][19]); // sorted, last
+        $this->assertNull($result['plus_ball']);
+    }
+
+    public function testParseMultiMultiWrongCount(): void
+    {
+        $parser = new MbnetLineParser(20, false);
+
+        // Only 19 numbers for a 20-pick game
+        $this->assertNull($parser->parse('1. 01.01.2026 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19'));
+    }
 }

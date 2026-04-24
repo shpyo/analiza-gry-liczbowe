@@ -70,4 +70,49 @@ final class ThresholdBucketStrategyTest extends TestCase
         $this->assertSame('XS', $boundaries[0]['label']);
         $this->assertNull($boundaries[4]['max']);
     }
+
+    public function testClassifyMultiMultiSum(): void
+    {
+        $mmSum = new ThresholdBucketStrategy([
+            ['label' => 'XS', 'max' => 675,  'description' => 'bardzo mała (≤675)'],
+            ['label' => 'S',  'max' => 745,  'description' => 'mała (676–745)'],
+            ['label' => 'M',  'max' => 875,  'description' => 'średnia (746–875)'],
+            ['label' => 'L',  'max' => 945,  'description' => 'duża (876–945)'],
+            ['label' => 'XL', 'max' => null, 'description' => 'bardzo duża (946+)'],
+        ]);
+
+        $this->assertSame('XS', $mmSum->classify(500));
+        $this->assertSame('XS', $mmSum->classify(675));   // boundary
+        $this->assertSame('S',  $mmSum->classify(676));   // just above
+        $this->assertSame('S',  $mmSum->classify(745));
+        $this->assertSame('M',  $mmSum->classify(746));
+        $this->assertSame('M',  $mmSum->classify(810));   // typical sum
+        $this->assertSame('M',  $mmSum->classify(875));
+        $this->assertSame('L',  $mmSum->classify(876));
+        $this->assertSame('L',  $mmSum->classify(945));
+        $this->assertSame('XL', $mmSum->classify(946));
+        $this->assertSame('XL', $mmSum->classify(1590));
+    }
+
+    public function testClassifyMultiMultiRange(): void
+    {
+        $mmRange = new ThresholdBucketStrategy([
+            ['label' => 'XS', 'max' => 62,   'description' => 'bardzo mały (≤62)'],
+            ['label' => 'S',  'max' => 70,   'description' => 'mały (63–70)'],
+            ['label' => 'M',  'max' => 75,   'description' => 'średni (71–75)'],
+            ['label' => 'L',  'max' => 78,   'description' => 'duży (76–78)'],
+            ['label' => 'XL', 'max' => null, 'description' => 'bardzo duży (79+)'],
+        ]);
+
+        $this->assertSame('XS', $mmRange->classify(50));
+        $this->assertSame('XS', $mmRange->classify(62));
+        $this->assertSame('S',  $mmRange->classify(63));
+        $this->assertSame('S',  $mmRange->classify(70));
+        $this->assertSame('M',  $mmRange->classify(71));
+        $this->assertSame('M',  $mmRange->classify(75));
+        $this->assertSame('L',  $mmRange->classify(76));
+        $this->assertSame('L',  $mmRange->classify(78));
+        $this->assertSame('XL', $mmRange->classify(79));
+        $this->assertSame('XL', $mmRange->classify(79));  // max possible range in 1-80
+    }
 }

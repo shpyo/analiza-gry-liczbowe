@@ -10,6 +10,9 @@ $pickCount    = $gameDef->pickCount;
 $poolSize     = $gameDef->poolSize;
 $drawsTable   = $gameDef->drawsTable;
 $profileTable = $gameDef->profileTable;
+$betPickMin   = $gameDef->betPickMin();
+$betPickMax   = $gameDef->betPickMax();
+$hasVarBet    = $betPickMin !== $betPickMax;
 
 // -----------------------------------------------------------------------
 // Build number weights from last N draws
@@ -49,16 +52,26 @@ $warnings    = [];
 $formPosted  = $_SERVER['REQUEST_METHOD'] === 'POST';
 
 if ($formPosted) {
-    $sumMin      = isset($_POST['sum_min'])       ? (int)$_POST['sum_min']       : 0;
-    $sumMax      = isset($_POST['sum_max'])       ? (int)$_POST['sum_max']       : $poolSize * $pickCount;
-    $evenMin     = isset($_POST['even_min'])      ? (int)$_POST['even_min']      : 0;
-    $evenMax     = isset($_POST['even_max'])      ? (int)$_POST['even_max']      : $pickCount;
-    $lowMin      = isset($_POST['low_min'])       ? (int)$_POST['low_min']       : 0;
-    $lowMax      = isset($_POST['low_max'])       ? (int)$_POST['low_max']       : $pickCount;
-    $consecMax   = isset($_POST['consec_max'])    ? (int)$_POST['consec_max']    : $pickCount;
-    $hotMin      = isset($_POST['hot_min'])       ? (int)$_POST['hot_min']       : 0;
-    $lastDigMax  = isset($_POST['last_digit_max'])? (int)$_POST['last_digit_max']: $pickCount;
-    $decadesMax  = isset($_POST['decades_max'])   ? max(1, min($pickCount, (int)$_POST['decades_max'])) : $pickCount;
+    // For variable-bet games (Multi Multi), pick count comes from the form
+    $betPickCount = $hasVarBet
+        ? max($betPickMin, min($betPickMax, (int)($_POST['bet_pick_count'] ?? $betPickMax)))
+        : $pickCount;
+
+    $sumAbsMin   = (int)($betPickCount * ($betPickCount + 1) / 2);
+    $sumAbsMax   = (int)($betPickCount * (2 * $poolSize - $betPickCount + 1) / 2);
+    $sumMin      = isset($_POST['sum_min'])       ? min($sumAbsMax, max($sumAbsMin, (int)$_POST['sum_min']))    : $sumAbsMin;
+    $sumMax      = isset($_POST['sum_max'])       ? min($sumAbsMax, max($sumAbsMin, (int)$_POST['sum_max']))    : $sumAbsMax;
+    $evenMin     = isset($_POST['even_min'])      ? min($betPickCount, max(0, (int)$_POST['even_min']))     : 0;
+    $evenMax     = isset($_POST['even_max'])      ? min($betPickCount, max(0, (int)$_POST['even_max']))     : $betPickCount;
+    $lowMin      = isset($_POST['low_min'])       ? min($betPickCount, max(0, (int)$_POST['low_min']))      : 0;
+    $lowMax      = isset($_POST['low_max'])       ? min($betPickCount, max(0, (int)$_POST['low_max']))      : $betPickCount;
+    $consecMax   = isset($_POST['consec_max'])    ? min($betPickCount - 1, max(0, (int)$_POST['consec_max'])): $betPickCount - 1;
+    $hotMin      = isset($_POST['hot_min'])       ? min($betPickCount, max(0, (int)$_POST['hot_min']))      : 0;
+    $lastDigMax  = isset($_POST['last_digit_max'])? min($betPickCount, max(1, (int)$_POST['last_digit_max'])): $betPickCount;
+    $decadesMax  = isset($_POST['decades_max'])   ? max(1, min($betPickCount, (int)$_POST['decades_max'])) : $betPickCount;
+    // Max dziesiątek to 8 dla MM (80 liczb / 10), min sens = 1
+    $decadesMaxPool = (int)ceil($poolSize / 10);
+    $decadesMin  = isset($_POST['decades_min'])   ? max(1, min($decadesMaxPool, (int)$_POST['decades_min'])) : 1;
     $wantedHashes= isset($_POST['profile_hashes']) && is_array($_POST['profile_hashes'])
                      ? $_POST['profile_hashes'] : [];
     $count       = max(1, min(AnalysisConfig::GENERATOR_MAX_COUPONS, (int)($_POST['count'] ?? AnalysisConfig::GENERATOR_DEFAULT_COUNT)));
@@ -78,7 +91,7 @@ if ($formPosted) {
         $pool     = $weights;
         $selected = [];
 
-        for ($pick = 0; $pick < $pickCount; $pick++) {
+        for ($pick = 0; $pick < $betPickCount; $pick++) {
             $totalW = array_sum($pool);
             if ($totalW <= 0) {
                 break;
@@ -95,7 +108,7 @@ if ($formPosted) {
             }
         }
 
-        if (count($selected) !== $pickCount) {
+        if (count($selected) !== $betPickCount) {
             continue;
         }
 
@@ -112,14 +125,14 @@ if ($formPosted) {
         $hotInCoupon = count(array_intersect($selected, $top10));
         if ($hotInCoupon < $hotMin) continue;
 
-        if ($decadesMax < $pickCount) {
-            $decadeGroups = [];
-            foreach ($selected as $n) {
-                $d = intdiv($n - 1, 10);
-                $decadeGroups[$d] = ($decadeGroups[$d] ?? 0) + 1;
-            }
-            if (max($decadeGroups) > $decadesMax) continue;
+        // Decades: compute groups for both min and max checks
+        $decadeGroups = [];
+        foreach ($selected as $n) {
+            $d = intdiv($n - 1, 10);
+            $decadeGroups[$d] = ($decadeGroups[$d] ?? 0) + 1;
         }
+        if ($metrics['decades_used'] < $decadesMin) continue;
+        if (max($decadeGroups) > $decadesMax) continue;
 
         if (!empty($wantedHashes) && !in_array($hash, $wantedHashes, true)) continue;
 
@@ -136,25 +149,55 @@ if ($formPosted) {
     }
 }
 
-// Default form values
+// Default form values (for non-POST render; betPickCount not yet set outside POST block)
+$defBetPickCount = $hasVarBet
+    ? max($betPickMin, min($betPickMax, (int)($_POST['bet_pick_count'] ?? $betPickMax)))
+    : $pickCount;
+
+// Sum range data for variable-bet games (e.g. Multi Multi)
+$sumRangeData = [];
+if ($hasVarBet) {
+    $sumRangeData = $kit->texts()->sumRangesForVarBet($gameDef);
+}
+
+// Smart defaults: use typical ranges (mean ± 1.5σ) instead of full 0–max
+$k  = $defBetPickCount;
+$N  = $poolSize;
+$sumMean  = $k * ($N + 1) / 2;
+$sumSigma = sqrt($k * ($N + 1) * ($N - $k) / 12);
+$defSumMin = max((int)($k * ($k + 1) / 2), (int)round($sumMean - 1.5 * $sumSigma));
+$defSumMax = min((int)($k * (2 * $N - $k + 1) / 2), (int)round($sumMean + 1.5 * $sumSigma));
+
+// Even/low: binomial mean ± 1 (for k numbers from pool, ~half are even/low)
+$evenMean = $k / 2;
+$defEvenMin = max(0, (int)floor($evenMean - 1));
+$defEvenMax = min($k, (int)ceil($evenMean + 1));
+$lowRatio   = $gameDef->lowThreshold / $N;
+$lowMean    = $k * $lowRatio;
+$defLowMin  = max(0, (int)floor($lowMean - 1));
+$defLowMax  = min($k, (int)ceil($lowMean + 1));
+
+// Decades: typical spread
+$defDecadesMin = max(1, (int)round($k * 0.5));
+
+$defSumAbsMax = (int)($k * (2 * $N - $k + 1) / 2);
 $def = [
-    'sum_min'        => (int)($_POST['sum_min']        ?? 0),
-    'sum_max'        => (int)($_POST['sum_max']        ?? $poolSize * $pickCount),
-    'even_min'       => (int)($_POST['even_min']       ?? 0),
-    'even_max'       => (int)($_POST['even_max']       ?? $pickCount),
-    'low_min'        => (int)($_POST['low_min']        ?? 0),
-    'low_max'        => (int)($_POST['low_max']        ?? $pickCount),
-    'consec_max'     => (int)($_POST['consec_max']     ?? $pickCount - 1),
-    'hot_min'        => (int)($_POST['hot_min']        ?? 0),
-    'last_digit_max' => (int)($_POST['last_digit_max'] ?? $pickCount),
-    'decades_max'    => (int)($_POST['decades_max']    ?? $pickCount),
+    'sum_min'        => min($defSumAbsMax, max(0, (int)($_POST['sum_min']        ?? $defSumMin))),
+    'sum_max'        => min($defSumAbsMax, max(0, (int)($_POST['sum_max']        ?? $defSumMax))),
+    'even_min'       => min($k, max(0, (int)($_POST['even_min']    ?? $defEvenMin))),
+    'even_max'       => min($k, max(0, (int)($_POST['even_max']    ?? $defEvenMax))),
+    'low_min'        => min($k, max(0, (int)($_POST['low_min']     ?? $defLowMin))),
+    'low_max'        => min($k, max(0, (int)($_POST['low_max']     ?? $defLowMax))),
+    'consec_max'     => min($k - 1, max(0, (int)($_POST['consec_max'] ?? 2))),
+    'hot_min'        => min($k, max(0, (int)($_POST['hot_min']     ?? 0))),
+    'last_digit_max' => min($k, max(1, (int)($_POST['last_digit_max'] ?? $k))),
+    'decades_max'    => min($k, max(1, (int)($_POST['decades_max']    ?? $k))),
+    'decades_min'    => max(1, (int)($_POST['decades_min']    ?? $defDecadesMin)),
     'count'          => (int)($_POST['count']          ?? 5),
+    'bet_pick_count' => $defBetPickCount,
 ];
 $postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hashes'])
     ? $_POST['profile_hashes'] : [];
-
-// Heatmap data for frequency grid
-$maxFreqHm = max(1, max(array_values($freqRows) ?: [1]));
 ?>
 
 <!-- Page Header -->
@@ -162,101 +205,173 @@ $maxFreqHm = max(1, max(array_values($freqRows) ?: [1]));
     <div class="page-header__row">
         <div>
             <h1 class="page-header__title">Generator kuponów</h1>
-            <p class="page-header__desc">Zaawansowane algorytmy dobierające liczby na podstawie historycznych trendów prawdopodobieństwa z ostatnich 500 losowań <?= h($gameDef->name) ?>.</p>
+            <p class="page-header__desc">Losowanie ważone częstością historyczną z ostatnich <?= AnalysisConfig::WINDOW_SIZE ?> losowań <?= h($gameDef->name) ?> z filtrami strukturalnymi.</p>
         </div>
     </div>
 </header>
 
-<div class="bento-grid">
-
     <!-- Generate Card (main) -->
-    <section class="card col-md-8 col-lg-8">
+    <section class="card">
         <form method="post" action="?page=generator&game=<?= h($game) ?>">
 
             <div class="flex justify-between items-center mb-6" style="flex-wrap:wrap;gap:0.5rem;">
                 <div>
-                    <span class="badge badge--info mb-2"><?= render_material_icon('bolt') ?> SMART ENGINE ACTIVE</span>
+                    <span class="badge badge--info mb-2"><?= render_material_icon('bolt') ?> LOSOWANIE WAŻONE + FILTRY</span>
                     <h2 class="text-headline-lg" style="margin-top:0.5rem;">Generuj kupony</h2>
                 </div>
-                <div class="form-group" style="min-width:100px;">
-                    <label class="form-label">Zestawy</label>
-                    <select name="count" class="form-select" style="width:auto;">
-                        <?php foreach (AnalysisConfig::GENERATOR_COUNT_OPTIONS as $c): ?>
-                            <option value="<?= $c ?>" <?= $def['count'] === $c ? 'selected' : '' ?>><?= $c ?> zest.</option>
-                        <?php endforeach; ?>
-                    </select>
+                <div class="flex gap-3" style="flex-wrap:wrap;align-items:flex-end;">
+                    <?php if ($hasVarBet): ?>
+                    <div class="form-group" style="min-width:120px;">
+                        <label class="form-label">Liczby w kuponie</label>
+                        <select name="bet_pick_count" class="form-select" style="width:auto;">
+                            <?php for ($bpc = $betPickMin; $bpc <= $betPickMax; $bpc++): ?>
+                                <option value="<?= $bpc ?>" <?= $def['bet_pick_count'] === $bpc ? 'selected' : '' ?>><?= $bpc ?> liczb</option>
+                            <?php endfor; ?>
+                        </select>
+                    </div>
+                    <?php endif; ?>
+                    <div class="form-group" style="min-width:100px;">
+                        <label class="form-label">Zestawy</label>
+                        <select name="count" class="form-select" style="width:auto;">
+                            <?php foreach (AnalysisConfig::GENERATOR_COUNT_OPTIONS as $c): ?>
+                                <option value="<?= $c ?>" <?= $def['count'] === $c ? 'selected' : '' ?>><?= $c ?> zest.</option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
                 </div>
             </div>
 
-            <!-- Placeholder / Generated balls -->
+            <!-- Generated balls (only when results available) -->
+            <?php if ($formPosted && !empty($results)): ?>
             <div class="balls-row balls-row--lg mb-6" style="justify-content:center;">
-                <?php if ($formPosted && !empty($results)): ?>
-                    <?php foreach ($results[0]['numbers'] as $n): ?>
-                        <?= render_ball($n, 'xl' . (in_array($n, $top10, true) ? ' ball--hot' : '')) ?>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <?php for ($i = 0; $i < $pickCount; $i++): ?>
-                        <span class="ball ball--xl ball--placeholder">?</span>
-                    <?php endfor; ?>
+                <?php foreach ($results[0]['numbers'] as $n): ?>
+                    <?= render_ball($n, 'xl' . (in_array($n, $top10, true) ? ' ball--hot' : '')) ?>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
+
+            <!-- Advanced Filters (always visible) -->
+            <div class="advanced-filters" style="margin-top:1.5rem;">
+                <h3 class="text-title-md mb-4">Zaawansowane filtry</h3>
+
+                <!-- SUMA -->
+                <?php
+                    $sumAbsMax = $poolSize * $defBetPickCount;
+                    $curSR = $sumRangeData[$defBetPickCount] ?? null;
+                ?>
+                <div class="filter-section">
+                    <div class="filter-section__title"><?= render_material_icon('functions') ?> Suma liczb</div>
+                    <div class="filter-grid-range">
+                        <div class="form-group">
+                            <label class="form-label">od</label>
+                            <input type="number" name="sum_min" value="<?= h((string)$def['sum_min']) ?>" min="<?= $curSR ? $curSR['min'] : 0 ?>" max="<?= $sumAbsMax ?>" class="form-input">
+                        </div>
+                        <span class="range-label">&ndash;</span>
+                        <div class="form-group">
+                            <label class="form-label">do</label>
+                            <input type="number" name="sum_max" value="<?= h((string)$def['sum_max']) ?>" min="<?= $curSR ? $curSR['min'] : 0 ?>" max="<?= $sumAbsMax ?>" class="form-input">
+                        </div>
+                    </div>
+                    <?php if ($hasVarBet && $curSR): ?>
+                    <p class="form-hint" style="margin-top:0.5rem;">
+                        Dla <strong id="sum-hint-k"><?= $defBetPickCount ?></strong> liczb: typowa <strong id="sum-hint-typ"><?= $curSR['typ_min'] ?>&ndash;<?= $curSR['typ_max'] ?></strong>
+                        &middot; zakres <span id="sum-hint-range"><?= $curSR['min'] ?>&ndash;<?= $curSR['max'] ?></span>
+                        &middot; ~<span id="sum-hint-mean"><?= $curSR['mean'] ?></span>
+                    </p>
+                    <?php endif; ?>
+                    <details class="filter-info">
+                        <summary><?= render_material_icon('help_outline') ?> Co to jest?</summary>
+                        <div class="filter-info__body">
+                            <strong>Suma liczb</strong> to łączna wartość wszystkich liczb na kuponie. Np. kupon 7+14+22+35+41+48 ma sumę 167. Bardzo niska lub bardzo wysoka suma zdarza się rzadko — typowe kupony mieszczą się w środkowym przedziale.
+                        </div>
+                    </details>
+                </div>
+                <?php if ($hasVarBet && $curSR): ?>
+                <script>
+                (function() {
+                    const ranges = <?= json_encode($sumRangeData, JSON_THROW_ON_ERROR) ?>;
+                    const sel = document.querySelector('[name="bet_pick_count"]');
+                    if (!sel) return;
+                    const posted = <?= $formPosted ? 'true' : 'false' ?>;
+                    function updateHint(k, updateValues) {
+                        const r = ranges[k];
+                        if (!r) return;
+                        document.getElementById('sum-hint-k').textContent = k;
+                        document.getElementById('sum-hint-typ').textContent = r.typ_min + '–' + r.typ_max;
+                        document.getElementById('sum-hint-range').textContent = r.min + '–' + r.max;
+                        document.getElementById('sum-hint-mean').textContent = r.mean;
+                        const sumMinEl = document.querySelector('[name="sum_min"]');
+                        const sumMaxEl = document.querySelector('[name="sum_max"]');
+                        if (sumMinEl) { sumMinEl.min = r.min; sumMinEl.max = r.max; }
+                        if (sumMaxEl) { sumMaxEl.min = r.min; sumMaxEl.max = r.max; }
+                        if (updateValues) {
+                            if (sumMinEl) sumMinEl.value = r.typ_min;
+                            if (sumMaxEl) sumMaxEl.value = r.typ_max;
+                        }
+                    }
+                    sel.addEventListener('change', function() { updateHint(parseInt(this.value), true); });
+                })();
+                </script>
                 <?php endif; ?>
-            </div>
 
-            <!-- Action buttons -->
-            <div class="flex gap-4 mb-8" style="flex-wrap:wrap;">
-                <button type="submit" class="btn btn--primary btn--lg flex-1">
-                    <?= render_material_icon('bolt') ?> GENERUJ LICZBY
-                </button>
-            </div>
-
-            <!-- Advanced Filters (collapsible) -->
-            <details class="card-details">
-                <summary>Zaawansowane filtry</summary>
-                <div class="details-content">
-                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-top:1rem;">
+                <!-- PARZYSTE / NISKIE -->
+                <div class="filter-section">
+                    <div class="filter-section__title"><?= render_material_icon('balance') ?> Parzyste / Niskie</div>
+                    <div class="filter-grid-range" style="margin-bottom:0.75rem;">
                         <div class="form-group">
-                            <label class="form-label"><?= $kit->texts()->renderTooltip('sum_total', $gameDef) ?> min</label>
-                            <input type="number" name="sum_min" value="<?= h((string)$def['sum_min']) ?>" min="0" max="999" class="form-input">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label"><?= $kit->texts()->renderTooltip('sum_total', $gameDef) ?> max</label>
-                            <input type="number" name="sum_max" value="<?= h((string)$def['sum_max']) ?>" min="0" max="999" class="form-input">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label"><?= $kit->texts()->renderTooltip('even_count', $gameDef) ?> min</label>
+                            <label class="form-label">Parzyste od</label>
                             <select name="even_min" class="form-select">
-                                <?php for ($i = 0; $i <= $pickCount; $i++): ?>
+                                <?php for ($i = 0; $i <= $defBetPickCount; $i++): ?>
                                     <option value="<?= $i ?>" <?= $def['even_min'] === $i ? 'selected' : '' ?>><?= $i ?></option>
                                 <?php endfor; ?>
                             </select>
                         </div>
+                        <span class="range-label">&ndash;</span>
                         <div class="form-group">
-                            <label class="form-label"><?= $kit->texts()->renderTooltip('even_count', $gameDef) ?> max</label>
+                            <label class="form-label">do</label>
                             <select name="even_max" class="form-select">
-                                <?php for ($i = 0; $i <= $pickCount; $i++): ?>
+                                <?php for ($i = 0; $i <= $defBetPickCount; $i++): ?>
                                     <option value="<?= $i ?>" <?= $def['even_max'] === $i ? 'selected' : '' ?>><?= $i ?></option>
                                 <?php endfor; ?>
                             </select>
                         </div>
+                    </div>
+                    <div class="filter-grid-range">
                         <div class="form-group">
-                            <label class="form-label"><?= $kit->texts()->renderTooltip('low_count', $gameDef) ?> min</label>
+                            <label class="form-label">Niskie (1–<?= $gameDef->lowThreshold ?>) od</label>
                             <select name="low_min" class="form-select">
-                                <?php for ($i = 0; $i <= $pickCount; $i++): ?>
+                                <?php for ($i = 0; $i <= $defBetPickCount; $i++): ?>
                                     <option value="<?= $i ?>" <?= $def['low_min'] === $i ? 'selected' : '' ?>><?= $i ?></option>
                                 <?php endfor; ?>
                             </select>
                         </div>
+                        <span class="range-label">&ndash;</span>
                         <div class="form-group">
-                            <label class="form-label"><?= $kit->texts()->renderTooltip('low_count', $gameDef) ?> max</label>
+                            <label class="form-label">do</label>
                             <select name="low_max" class="form-select">
-                                <?php for ($i = 0; $i <= $pickCount; $i++): ?>
+                                <?php for ($i = 0; $i <= $defBetPickCount; $i++): ?>
                                     <option value="<?= $i ?>" <?= $def['low_max'] === $i ? 'selected' : '' ?>><?= $i ?></option>
                                 <?php endfor; ?>
                             </select>
                         </div>
+                    </div>
+                    <details class="filter-info">
+                        <summary><?= render_material_icon('help_outline') ?> Co to jest?</summary>
+                        <div class="filter-info__body">
+                            <strong>Parzyste</strong> — ile liczb w kuponie jest parzystych (2, 4, 6…). W typowym losowaniu najczęściej wychodzą 3 parzyste i 3 nieparzyste.
+                            <strong>Niskie</strong> — ile liczb pochodzi z dolnej połowy puli (1–<?= $gameDef->lowThreshold ?>).
+                        </div>
+                    </details>
+                </div>
+
+                <!-- PARY SĄSIADÓW + GORĄCE + CYFRY JEDNOŚCI -->
+                <div class="filter-section">
+                    <div class="filter-section__title"><?= render_material_icon('local_fire_department') ?> Sąsiedzi, gorące i cyfry</div>
+                    <div class="filter-grid-3">
                         <div class="form-group">
-                            <label class="form-label"><?= $kit->texts()->renderTooltip('consecutive', $gameDef) ?> maks.</label>
+                            <label class="form-label">Maks. par sąsiednich</label>
                             <select name="consec_max" class="form-select">
-                                <?php for ($i = 0; $i < $pickCount; $i++): ?>
+                                <?php for ($i = 0; $i < $defBetPickCount; $i++): ?>
                                     <option value="<?= $i ?>" <?= $def['consec_max'] === $i ? 'selected' : '' ?>><?= $i ?></option>
                                 <?php endfor; ?>
                             </select>
@@ -264,130 +379,128 @@ $maxFreqHm = max(1, max(array_values($freqRows) ?: [1]));
                         <div class="form-group">
                             <label class="form-label">Min. gorących (top-10)</label>
                             <select name="hot_min" class="form-select">
-                                <?php for ($i = 0; $i <= $pickCount; $i++): ?>
+                                <?php for ($i = 0; $i <= $defBetPickCount; $i++): ?>
                                     <option value="<?= $i ?>" <?= $def['hot_min'] === $i ? 'selected' : '' ?>><?= $i ?></option>
                                 <?php endfor; ?>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label class="form-label"><?= $kit->texts()->renderTooltip('last_digit_unique', $gameDef) ?> maks.</label>
+                            <label class="form-label">Maks. unikalnych cyfr jedności</label>
                             <select name="last_digit_max" class="form-select">
-                                <?php for ($i = 1; $i <= $pickCount; $i++): ?>
+                                <?php for ($i = 1; $i <= $defBetPickCount; $i++): ?>
                                     <option value="<?= $i ?>" <?= $def['last_digit_max'] === $i ? 'selected' : '' ?>><?= $i ?></option>
                                 <?php endfor; ?>
                             </select>
                         </div>
+                    </div>
+                    <p class="form-hint" style="margin-top:0.375rem;">
+                        Gorące: <?= implode(', ', $top10) ?>
+                    </p>
+                    <details class="filter-info">
+                        <summary><?= render_material_icon('help_outline') ?> Co to jest?</summary>
+                        <div class="filter-info__body">
+                            <strong>Para sąsiednich</strong> — dwie liczby obok siebie, np. 17 i 18. W ok. 65% losowań pojawia się co najmniej jedna para.
+                            <strong>Gorące liczby</strong> — top-10 najczęściej losowanych w ostatnich <?= AnalysisConfig::WINDOW_SIZE ?> losowaniach.
+                            <strong>Cyfry jedności</strong> — ostatnia cyfra każdej liczby (np. w 21, 31, 41 jedność to 1). Im więcej różnych, tym bardziej rozrzucony kupon.
+                        </div>
+                    </details>
+                </div>
+
+                <!-- DZIESIĄTKI -->
+                <?php $defDecadesMaxPool = (int)ceil($poolSize / 10); ?>
+                <div class="filter-section">
+                    <div class="filter-section__title"><?= render_material_icon('grid_view') ?> Dziesiątki</div>
+                    <div class="filter-grid-2">
                         <div class="form-group">
-                            <label class="form-label"><?= $kit->texts()->renderTooltip('decades_used', $gameDef) ?> maks. z jednej</label>
-                            <input type="number" name="decades_max" value="<?= h((string)$def['decades_max']) ?>" min="1" max="<?= $pickCount ?>" class="form-input">
+                            <label class="form-label">Min. różnych dziesiątek</label>
+                            <input type="number" name="decades_min" value="<?= h((string)$def['decades_min']) ?>" min="1" max="<?= $defDecadesMaxPool ?>" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Maks. z jednej dziesiątki</label>
+                            <input type="number" name="decades_max" value="<?= h((string)$def['decades_max']) ?>" min="1" max="<?= $defBetPickCount ?>" class="form-input">
                         </div>
                     </div>
-
-                    <?php if (!empty($profileHashes)): ?>
-                    <div style="margin-top:1rem;">
-                        <label class="form-label"><?= $kit->texts()->renderTooltip('profile_hash', $gameDef) ?> (Ctrl+klik dla wielu)</label>
-                        <select name="profile_hashes[]" multiple size="5" class="form-select" style="height:auto;">
-                            <?php foreach ($profileHashes as $ph): ?>
-                                <option value="<?= h($ph['profile_hash']) ?>"
-                                    <?= in_array($ph['profile_hash'], $postedHashes, true) ? 'selected' : '' ?>>
-                                    <?= h($kit->describer()->describeShort($ph['profile_hash'])) ?>
-                                    &nbsp;(<?= h((string)$ph['total_draws']) ?>x / <?= h((string)$ph['pct_of_total']) ?>%)
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                        <p class="form-hint">Wybierz profile aby ograniczyć generowanie do określonych wzorców strukturalnych.</p>
-                    </div>
-                    <?php endif; ?>
+                    <details class="filter-info">
+                        <summary><?= render_material_icon('help_outline') ?> Co to jest?</summary>
+                        <div class="filter-info__body">
+                            <strong>Dziesiątki</strong> to grupy: 1–10, 11–20, 21–30 itd.
+                            <strong>Min. różnych</strong> — z ilu grup pochodzi kupon.
+                            <strong>Maks. z jednej</strong> — ile liczb może być z tej samej grupy.
+                        </div>
+                    </details>
                 </div>
-            </details>
-        </form>
 
-        <!-- Frequency Heat Map -->
-        <div style="margin-top:2rem;">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-headline-md">Heatmapa częstości</h3>
-                <div class="flex items-center gap-3 text-body-sm text-outline">
-                    <span style="display:inline-flex;align-items:center;gap:0.25rem;"><span style="width:0.75rem;height:0.75rem;border-radius:var(--radius-full);background:var(--secondary-container);display:inline-block;"></span> Niska</span>
-                    <span style="display:inline-flex;align-items:center;gap:0.25rem;"><span style="width:0.75rem;height:0.75rem;border-radius:var(--radius-full);background:var(--tertiary);display:inline-block;"></span> Wysoka</span>
-                </div>
-            </div>
-            <div class="freq-heatmap">
-                <?php for ($n = 1; $n <= $poolSize; $n++):
-                    $freq = (int)($freqRows[$n] ?? 0);
-                    $ratio = $maxFreqHm > 0 ? $freq / $maxFreqHm : 0;
-                    $isHot = in_array($n, $top10, true);
-                    if ($isHot) {
-                        $bg = "var(--tertiary)";
-                        $color = "var(--on-tertiary)";
-                    } elseif ($ratio > AnalysisConfig::GENERATOR_HEATMAP_HOT_RATIO) {
-                        $bg = "var(--tertiary-fixed-dim)";
-                        $color = "var(--on-tertiary-fixed)";
-                    } elseif ($ratio > AnalysisConfig::GENERATOR_HEATMAP_WARM_RATIO) {
-                        $bg = "var(--secondary-container)";
-                        $color = "var(--on-primary-fixed)";
-                    } else {
-                        $bg = "var(--surface-container-high)";
-                        $color = "var(--on-surface-variant)";
-                    }
-                ?>
-                <div class="freq-heatmap__cell" style="background:<?= $bg ?>;color:<?= $color ?>;" title="<?= h("{$n}: {$freq} trafień") ?>"><?= $n ?></div>
-                <?php endfor; ?>
-            </div>
-            <p class="text-body-sm text-outline" style="margin-top:0.75rem;">
-                <?= render_material_icon('info', 'icon-filled') ?>
-                Częstość z ostatnich 500 losowań. Pomarańczowe pola to gorące liczby.
-            </p>
-        </div>
-    </section>
-
-    <!-- Right Sidebar -->
-    <div class="col-md-4 col-lg-4" style="display:flex;flex-direction:column;gap:1.5rem;">
-
-        <!-- Generated History -->
-        <?php if ($formPosted && !empty($results)): ?>
-        <section class="card">
-            <h3 class="text-headline-md mb-4">Wygenerowane kupony</h3>
-            <div style="display:flex;flex-direction:column;gap:0.75rem;">
-                <?php foreach ($results as $idx => $r): ?>
-                <div class="gen-history-item">
-                    <div class="gen-history-item__time">Kupon <?= $idx + 1 ?></div>
-                    <div class="balls-row" style="gap:0.25rem;">
-                        <?php foreach ($r['numbers'] as $n): ?>
-                            <?= render_ball($n, 'sm' . (in_array($n, $top10, true) ? ' ball--hot' : '')) ?>
+                <?php if (!empty($profileHashes) && !$hasVarBet): ?>
+                <!-- PROFIL -->
+                <div class="filter-section">
+                    <div class="filter-section__title"><?= render_material_icon('fingerprint') ?> Profil strukturalny</div>
+                    <p class="form-hint mb-3">Wybierz profile, aby ograniczyć generowanie do określonych wzorców. Zostaw puste = bez ograniczeń.</p>
+                    <div class="profile-checkboxes">
+                        <?php
+                        $topProfiles = array_slice($profileHashes, 0, 10);
+                        foreach ($topProfiles as $ph): ?>
+                            <label class="profile-check">
+                                <input type="checkbox" name="profile_hashes[]" value="<?= h($ph['profile_hash']) ?>"
+                                    <?= in_array($ph['profile_hash'], $postedHashes, true) ? 'checked' : '' ?>>
+                                <span><?= h($kit->describer()->describeShort($ph['profile_hash'])) ?></span>
+                                <span class="profile-check__pct"><?= h((string)$ph['total_draws']) ?>x (<?= h((string)$ph['pct_of_total']) ?>%)</span>
+                            </label>
                         <?php endforeach; ?>
                     </div>
+                    <?php if (count($profileHashes) > 10): ?>
+                    <details class="filter-info" style="margin-top:0.5rem;">
+                        <summary><?= render_material_icon('expand_more') ?> Pokaż wszystkie (<?= count($profileHashes) ?>)</summary>
+                        <div class="filter-info__body" style="padding:0;">
+                            <div class="profile-checkboxes" style="max-height:15rem;">
+                                <?php foreach (array_slice($profileHashes, 10) as $ph): ?>
+                                    <label class="profile-check">
+                                        <input type="checkbox" name="profile_hashes[]" value="<?= h($ph['profile_hash']) ?>"
+                                            <?= in_array($ph['profile_hash'], $postedHashes, true) ? 'checked' : '' ?>>
+                                        <span><?= h($kit->describer()->describeShort($ph['profile_hash'])) ?></span>
+                                        <span class="profile-check__pct"><?= h((string)$ph['total_draws']) ?>x (<?= h((string)$ph['pct_of_total']) ?>%)</span>
+                                    </label>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                    </details>
+                    <?php endif; ?>
                 </div>
-                <?php endforeach; ?>
+                <?php endif; ?>
             </div>
-        </section>
-        <?php endif; ?>
 
-        <!-- Analysis Card -->
-        <?php if ($formPosted && !empty($results)): ?>
-        <section class="analysis-card">
-            <h3 class="text-headline-md mb-3" style="font-family:var(--font-headline);">Analiza ukończona</h3>
-            <p style="color:rgba(255,255,255,0.8);font-size:0.875rem;margin-bottom:1.5rem;line-height:1.6;">
-                Wygenerowano <?= count($results) ?> kuponów z wagami opartymi na historycznej częstości.
-                Top-10 gorących: <?= implode(', ', $top10) ?>.
-            </p>
-            <div class="progress-bar" style="margin-bottom:0.5rem;">
-                <div class="progress-bar__fill" style="width:72%;"></div>
+            <!-- Generate button (sticky at bottom) -->
+            <div class="form-actions-sticky">
+                <button type="submit" class="btn btn--primary btn--lg flex-1 w-full">
+                    <?= render_material_icon('bolt') ?> GENERUJ LICZBY
+                </button>
             </div>
-            <div class="flex justify-between" style="font-size:0.75rem;opacity:0.8;">
-                <span>Zgodność z wzorcem</span>
-                <span style="font-weight:700;">72%</span>
-            </div>
-        </section>
-        <?php else: ?>
-        <section class="card card--tonal">
-            <h3 class="text-headline-md mb-3">PRO TIP</h3>
-            <p class="text-body-sm text-on-surface-variant leading-relaxed">
-                Wygenerowane liczby oparte są na trendach prawdopodobieństwa z ostatnich 500 losowań. Gorące liczby mają wyższe wagi, ale każda liczba ma szansę. Użyj filtrów, aby doprecyzować kryteria kuponu.
-            </p>
-        </section>
-        <?php endif; ?>
-    </div>
-</div>
+        </form>
+
+    </section>
+
+
+
+<!-- Analiza ukończona / PRO TIP (below form) -->
+<?php if ($formPosted && !empty($results)): ?>
+<section class="analysis-card" style="margin-top:1.5rem;">
+    <h3 class="text-headline-md mb-3" style="font-family:var(--font-headline);">Generowanie zakończone</h3>
+    <p style="color:rgba(255,255,255,0.8);font-size:0.875rem;margin-bottom:0.75rem;line-height:1.6;">
+        Wygenerowano <?= count($results) ?> kuponów z wagami opartymi na historycznej częstości z ostatnich <?= AnalysisConfig::WINDOW_SIZE ?> losowań.
+        Top-10 najczęstszych: <?= implode(', ', $top10) ?>.
+    </p>
+    <p style="color:rgba(255,255,255,0.55);font-size:0.75rem;line-height:1.5;">
+        Uwaga: historyczna częstość nie gwarantuje przyszłych wyników. Każda kombinacja ma identyczne prawdopodobieństwo wylosowania.
+    </p>
+</section>
+<?php else: ?>
+<section class="card card--tonal" style="margin-top:1.5rem;">
+    <h3 class="text-headline-md mb-3">PRO TIP</h3>
+    <p class="text-body-sm text-on-surface-variant leading-relaxed">
+        Wygenerowane liczby oparte są na częstości występowania z ostatnich <?= AnalysisConfig::WINDOW_SIZE ?> losowań. Częściej losowane liczby mają wyższe wagi, ale każda liczba ma szansę. Użyj filtrów, aby doprecyzować kryteria strukturalne kuponu.
+        Pamiętaj: w loterii każda kombinacja ma identyczne prawdopodobieństwo — filtry pomagają jedynie unikać nietypowych wzorców.
+    </p>
+</section>
+<?php endif; ?>
 
 <?php if (!empty($warnings)): ?>
     <?php foreach ($warnings as $w): ?>
