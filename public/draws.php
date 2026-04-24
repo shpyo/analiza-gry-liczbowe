@@ -63,10 +63,8 @@ $rows = $dataStmt->fetchAll();
 // -----------------------------------------------------------------------
 function draws_url(array $overrides = []): string
 {
-    global $game, $page, $dateFrom, $dateTo, $currentPage;
+    global $router, $game, $dateFrom, $dateTo, $currentPage;
     $params = [
-        'page'      => 'draws',
-        'game'      => $game,
         'date_from' => $dateFrom,
         'date_to'   => $dateTo,
         'p'         => $currentPage,
@@ -74,7 +72,7 @@ function draws_url(array $overrides = []): string
     foreach ($overrides as $k => $v) {
         $params[$k] = $v;
     }
-    return '?' . http_build_query(array_filter($params, fn($v) => $v !== ''));
+    return $router->url('draws', $game, $params);
 }
 ?>
 
@@ -90,9 +88,7 @@ function draws_url(array $overrides = []): string
 </header>
 
 <!-- Date Filter -->
-<form method="get" action="" class="filter-card">
-    <input type="hidden" name="page" value="draws">
-    <input type="hidden" name="game" value="<?= h($game) ?>">
+<form method="get" action="<?= h($router->url('draws', $game)) ?>" class="filter-card">
     <div class="form-row">
         <div class="form-group">
             <label class="form-label">Od</label>
@@ -106,7 +102,7 @@ function draws_url(array $overrides = []): string
             <?= render_material_icon('filter_list') ?> Filtruj
         </button>
         <?php if ($dateFrom !== '' || $dateTo !== ''): ?>
-            <a href="?page=draws&game=<?= h($game) ?>" class="btn btn--ghost btn--sm">Wyczyść</a>
+            <a href="<?= h($router->url('draws', $game)) ?>" class="btn btn--ghost btn--sm">Wyczyść</a>
         <?php endif; ?>
     </div>
     <p class="form-hint" style="margin-top:0.5rem;">

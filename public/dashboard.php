@@ -69,7 +69,7 @@ if ($lastDraw) {
             <p class="page-header__desc">Kompleksowe zestawienie statystyczne najnowszego losowania <?= h($gameDef->name) ?>. Analiza częstości, trendów i wzorców.</p>
         </div>
         <div>
-            <a href="?page=validator&game=<?= h($game) ?>" class="btn btn--secondary btn--lg">
+            <a href="<?= h($router->url('validator', $game)) ?>" class="btn btn--secondary btn--lg">
                 <?= render_material_icon('confirmation_number', 'icon-filled') ?>
                 Weryfikuj kupon
             </a>
@@ -78,7 +78,7 @@ if ($lastDraw) {
 </header>
 
 <?php if (!$lastDraw): ?>
-    <div class="alert alert-error">Brak losowań w bazie. Użyj <a href="?page=import&game=<?= h($game) ?>">Import</a> aby pobrać dane.</div>
+    <div class="alert alert-error">Brak losowań w bazie. Użyj <a href="<?= h($router->url('import', $game)) ?>">Import</a> aby pobrać dane.</div>
 <?php else: ?>
 
 <!-- Bento Grid -->
@@ -142,7 +142,7 @@ if ($lastDraw) {
             <?php endforeach; ?>
         </div>
 
-        <a href="?page=stats&game=<?= h($game) ?>" class="btn btn--ghost btn--full" style="margin-top:1rem;">
+        <a href="<?= h($router->url('stats', $game)) ?>" class="btn btn--ghost btn--full" style="margin-top:1rem;">
             Zobacz statystyki <?= render_material_icon('arrow_forward') ?>
         </a>
     </section>
@@ -180,7 +180,7 @@ if ($lastDraw) {
         <div class="relative z-10">
             <h2 class="text-headline-lg mb-3" style="font-family:var(--font-headline);">Generuj moje liczby</h2>
             <p style="color:rgba(255,255,255,0.8);font-size:0.875rem;margin-bottom:1.5rem;line-height:1.6;">Nasz algorytm dobierze liczby na podstawie historycznych trendów prawdopodobieństwa.</p>
-            <a href="?page=generator&game=<?= h($game) ?>" class="btn btn--white">Szybki generator</a>
+            <a href="<?= h($router->url('generator', $game)) ?>" class="btn btn--white">Szybki generator</a>
         </div>
     </section>
 

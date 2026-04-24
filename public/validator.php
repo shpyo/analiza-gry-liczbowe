@@ -81,7 +81,7 @@ $totalDraws = (int)$pdo->query("SELECT COUNT(*) FROM `{$drawsTable}`")->fetchCol
 
 <!-- Input Form -->
 <div class="card mb-6">
-    <form method="post" action="?page=validator&game=<?= h($game) ?>">
+    <form method="post" action="<?= h($router->url('validator', $game)) ?>">
         <p class="text-body-sm text-on-surface-variant mb-4">Wpisz liczby w dowolnej kolejności — zostaną automatycznie posortowane.</p>
 
         <div class="flex gap-3 mb-6" style="flex-wrap:wrap;justify-content:center;">

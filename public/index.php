@@ -14,14 +14,18 @@ $kit = new GameKit($pdo);
 // -----------------------------------------------------------------------
 // Routing
 // -----------------------------------------------------------------------
-$allowedPages = ['dashboard', 'draws', 'stats', 'generator', 'validator', 'cooccurrence', 'sync', 'import'];
-$page = isset($_GET['page']) ? trim($_GET['page']) : 'dashboard';
-if (!in_array($page, $allowedPages, true)) {
-    $page = 'dashboard';
+$router = new Router($kit->registry()->allSlugs());
+$route  = $router->parse($_SERVER['REQUEST_URI'] ?? '/');
+
+if ($route['page'] === 'home') {
+    header('Location: ' . $router->url('dashboard', 'lotto'), true, 302);
+    exit;
 }
 
-$gameDef = $kit->gameFromRequest();
-$game    = $gameDef->slug;
+$notFound = $route['notFound'];
+$page     = $route['page'];
+$gameDef  = $kit->game($route['gameSlug'] ?? 'lotto');
+$game     = $gameDef->slug;
 
 $gameNames = [];
 foreach ($kit->registry()->allSlugs() as $_slug) {
@@ -51,12 +55,12 @@ foreach ($kit->registry()->allSlugs() as $_slug) {
         <button class="menu-toggle" onclick="document.body.classList.toggle('sidebar-open')" aria-label="Menu">
             <span class="material-symbols-outlined">menu</span>
         </button>
-        <a href="?page=dashboard&game=<?= h($game) ?>" class="top-navbar__logo" style="text-decoration:none;color:inherit;">LottoAnalytics</a>
+        <a href="<?= h($router->url('dashboard', $game)) ?>" class="top-navbar__logo" style="text-decoration:none;color:inherit;">LottoAnalytics</a>
     </div>
 
     <div class="top-navbar__games">
         <?php foreach ($gameNames as $slug => $name): ?>
-            <a href="<?= h('?page=' . urlencode($page) . '&game=' . urlencode($slug)) ?>"
+            <a href="<?= h($router->url($page, $slug)) ?>"
                class="<?= $slug === $game ? 'active' : '' ?>">
                 <?= h($name) ?>
             </a>
@@ -103,7 +107,7 @@ foreach ($kit->registry()->allSlugs() as $_slug) {
             $sidebarLinks['import'] = ['icon' => 'download', 'label' => NAV_LABELS['import']];
             foreach ($sidebarLinks as $pg => $meta):
                 $isActive = ($pg === $page);
-                $url = '?page=' . urlencode($pg) . '&game=' . urlencode($game);
+                $url = $router->url($pg, $game);
             ?>
             <a href="<?= h($url) ?>" class="sidebar__link<?= $isActive ? ' active' : '' ?>">
                 <span class="material-symbols-outlined"><?= $meta['icon'] ?></span>
@@ -124,11 +128,16 @@ foreach ($kit->registry()->allSlugs() as $_slug) {
     <main class="main-content">
     <?php
     try {
-        $pageFile = __DIR__ . '/' . $page . '.php';
-        if (file_exists($pageFile)) {
-            include $pageFile;
+        if ($notFound) {
+            http_response_code(404);
+            echo '<div class="alert alert-error">Nie znaleziono strony.</div>';
         } else {
-            echo '<div class="alert alert-error">Nie znaleziono strony: ' . h($page) . '</div>';
+            $pageFile = __DIR__ . '/' . $page . '.php';
+            if (file_exists($pageFile)) {
+                include $pageFile;
+            } else {
+                echo '<div class="alert alert-error">Nie znaleziono strony: ' . h($page) . '</div>';
+            }
         }
     } catch (PDOException $e) {
         echo '<div class="alert alert-error">Błąd bazy danych: ' . h($e->getMessage()) . '</div>';

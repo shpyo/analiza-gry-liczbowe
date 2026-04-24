@@ -20,3 +20,4 @@ require_once $srcDir . '/CoOccurrenceRepository.php';
 require_once $srcDir . '/AnalysisConfig.php';
 require_once $srcDir . '/GameRegistry.php';
 require_once $srcDir . '/GameKit.php';
+require_once $srcDir . '/Router.php';

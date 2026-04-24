@@ -35,8 +35,8 @@ $topTriples = $activeTab === 'triples'
 
 // Helper – base URL preserving the other tab's filter values
 function cooc_url(string $game, string $tab, array $extra = []): string {
-    $params = array_merge(['page' => 'cooccurrence', 'game' => $game, 'tab' => $tab], $extra);
-    return '?' . http_build_query($params);
+    global $router;
+    return $router->url('cooccurrence', $game, array_merge(['tab' => $tab], $extra));
 }
 
 $pairsBaseUrl   = cooc_url($game, 'pairs',   ['pairs_min'   => $pairsMinCount,   'triples_min' => $triplesMinCount]);
@@ -84,9 +84,7 @@ $triplesBaseUrl = cooc_url($game, 'triples', ['pairs_min'   => $pairsMinCount,  
 
 <!-- Filter: Pairs -->
 <div class="card" style="grid-column: 1 / -1;">
-<form method="get" action="" class="filter-card" style="margin:0;border:0;padding:0;background:none;">
-    <input type="hidden" name="page"        value="cooccurrence">
-    <input type="hidden" name="game"        value="<?= h($game) ?>">
+<form method="get" action="<?= h($router->url('cooccurrence', $game)) ?>" class="filter-card" style="margin:0;border:0;padding:0;background:none;">
     <input type="hidden" name="tab"         value="pairs">
     <input type="hidden" name="triples_min" value="<?= h((string)$triplesMinCount) ?>">
     <div class="form-row">
@@ -159,9 +157,7 @@ $triplesBaseUrl = cooc_url($game, 'triples', ['pairs_min'   => $pairsMinCount,  
 
 <!-- Filter: Triples -->
 <div class="card" style="grid-column: 1 / -1;">
-<form method="get" action="" class="filter-card" style="margin:0;border:0;padding:0;background:none;">
-    <input type="hidden" name="page"      value="cooccurrence">
-    <input type="hidden" name="game"      value="<?= h($game) ?>">
+<form method="get" action="<?= h($router->url('cooccurrence', $game)) ?>" class="filter-card" style="margin:0;border:0;padding:0;background:none;">
     <input type="hidden" name="tab"       value="triples">
     <input type="hidden" name="pairs_min" value="<?= h((string)$pairsMinCount) ?>">
     <div class="form-row">

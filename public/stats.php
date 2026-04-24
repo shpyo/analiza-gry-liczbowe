@@ -160,16 +160,14 @@ usort($stats, function ($a, $b) use ($sort, $dir) {
 // -----------------------------------------------------------------------
 function stats_sort_url(string $col): string
 {
-    global $game, $sort, $dir, $dateFrom, $dateTo;
+    global $router, $game, $sort, $dir, $dateFrom, $dateTo;
     $newDir = ($sort === $col && $dir === 'asc') ? 'desc' : 'asc';
-    return '?' . http_build_query(array_filter([
-        'page'      => 'stats',
-        'game'      => $game,
+    return $router->url('stats', $game, [
         'sort'      => $col,
         'dir'       => $newDir,
         'date_from' => $dateFrom,
         'date_to'   => $dateTo,
-    ], fn($v) => $v !== ''));
+    ]);
 }
 
 function sort_arrow(string $col): string
@@ -266,9 +264,7 @@ $maxDecadeFreq = max(1, ...array_values($decadeFreq));
 </header>
 
 <!-- Date Filter -->
-<form method="get" action="" class="filter-card">
-    <input type="hidden" name="page" value="stats">
-    <input type="hidden" name="game" value="<?= h($game) ?>">
+<form method="get" action="<?= h($router->url('stats', $game)) ?>" class="filter-card">
     <input type="hidden" name="sort" value="<?= h($sort) ?>">
     <input type="hidden" name="dir" value="<?= h($dir) ?>">
     <div class="form-row">
@@ -284,7 +280,7 @@ $maxDecadeFreq = max(1, ...array_values($decadeFreq));
             <?= render_material_icon('filter_list') ?> Filtruj
         </button>
         <?php if ($dateFrom !== '' || $dateTo !== ''): ?>
-            <a href="?page=stats&game=<?= h($game) ?>" class="btn btn--ghost btn--sm">Wyczyść</a>
+            <a href="<?= h($router->url('stats', $game)) ?>" class="btn btn--ghost btn--sm">Wyczyść</a>
         <?php endif; ?>
     </div>
     <p class="form-hint" style="margin-top:0.5rem;">Łącznie losowań: <strong><?= h((string)$totalDraws) ?></strong> &mdash; Ostatni numer: <strong><?= h((string)$maxDrawNum) ?></strong></p>

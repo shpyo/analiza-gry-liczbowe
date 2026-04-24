@@ -212,7 +212,7 @@ $postedHashes = isset($_POST['profile_hashes']) && is_array($_POST['profile_hash
 
     <!-- Generate Card (main) -->
     <section class="card">
-        <form method="post" action="?page=generator&game=<?= h($game) ?>">
+        <form method="post" action="<?= h($router->url('generator', $game)) ?>">
 
             <div class="flex justify-between items-center mb-6" style="flex-wrap:wrap;gap:0.5rem;">
                 <div>
